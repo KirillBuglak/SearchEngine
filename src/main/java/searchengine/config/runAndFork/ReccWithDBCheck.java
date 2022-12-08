@@ -6,6 +6,9 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 import searchengine.model.Page;
 import searchengine.services.IndexService;
 import searchengine.services.LemmaService;
@@ -13,13 +16,11 @@ import searchengine.services.PageService;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.RecursiveAction;
-import java.util.concurrent.RecursiveTask;
 
-public class ReccWithDBCheck extends RecursiveTask<String> {
+//@Component
+public class ReccWithDBCheck extends RecursiveAction {
     private final PageService pageService;
     private final LemmaService lemmaService;
     private final IndexService indexService;
@@ -28,53 +29,53 @@ public class ReccWithDBCheck extends RecursiveTask<String> {
     private final StringBuilder content = new StringBuilder();
     private final String pageRegEx = "https?://([-\\w.+=&?$%]+/?)+";
 
-    public ReccWithDBCheck(Page page, ReccWithDBCheck parent) {
+    public ReccWithDBCheck(Page page, PageService pageService, LemmaService lemmaService, IndexService indexService) {
         this.page = page;
-        this.pageService = parent.pageService;
-        this.lemmaService = parent.lemmaService;
-        this.indexService = parent.indexService;
-    }
-
-    public ReccWithDBCheck(PageService pageService, LemmaService lemmaService, IndexService indexService, Page page) {
         this.pageService = pageService;
         this.lemmaService = lemmaService;
         this.indexService = indexService;
-        this.page = page;
     }
+//fixme add services in all constructors
 
+    //    @Autowired
+//    public ReccWithDBCheck(PageService pageService, LemmaService lemmaService, IndexService indexService) {
+//        this.pageService = pageService;
+//        this.lemmaService = lemmaService;
+//        this.indexService = indexService;
+//    }
     @Override
-    public String compute() {
+    public void compute() {
         List<ReccWithDBCheck> tasks = new ArrayList<>();
         Document document = requestDoc(page.getPath());
         //fixme saving to db
-        page.setCode(statusCode);
-        page.setContent(content.toString());
-        pageService.save(page);
-        if (String.valueOf(page.getCode()).charAt(0) != 4 && String.valueOf(page.getCode()).charAt(0) != 5) {//fixme make it easier
-            lemmaService.saveLemmas(page);
-            indexService.saveIndex(page);
-        }
+            page.setCode(statusCode);
+            page.setContent(content.toString());
+            pageService.save(page);
+            if (String.valueOf(page.getCode()).charAt(0) != 4 && String.valueOf(page.getCode()).charAt(0) != 5) {//fixme make it easier
+                lemmaService.saveLemmas(page);
+                indexService.saveIndex(page);
+            }
         //fixme saving to db
-        Elements elements = null;
-        if (document != null) {
-            elements = document.select("a[href]");
-        }
-        if (elements != null) {
-            elements.forEach(element -> {
-                String link = element.absUrl("href");
-                if (link.contains(page.getPath()) && link.matches(pageRegEx)
-                        && (pageService.getPageByPath(link) == null)) {//fixme delete
-                    System.out.println(link);
-                    Page newPage = new Page(page.getSite(), link, 0, null);
-                    ReccWithDBCheck task = new ReccWithDBCheck(newPage, this);
-                    task.fork();
-                    tasks.add(task);
-                }
-            });
-        }
-        tasks.forEach(ForkJoinTask::join);
-        System.err.println("Done! - Site " + page.getSite().getName() + " is indexed");
-        return "DONE";
+            Elements elements = null;
+            if (document != null) {
+                elements = document.select("a[href]");
+            }
+            if (elements != null) {
+                elements.forEach(element -> {
+                    String link = element.absUrl("href");
+                    if (link.contains(page.getPath()) && link.matches(pageRegEx)
+                            && (pageService.getPageByPath(link) == null)) {
+                        System.out.println(link);
+                        Page newPage = new Page(page.getSite(), link, 0, null);
+                        ReccWithDBCheck task = new ReccWithDBCheck(newPage, this.pageService, this.lemmaService, this.indexService);
+                        task.fork();
+//                        tasks.add(task);
+                        task.invoke();
+                    }
+                });
+            }
+//            tasks.forEach(ForkJoinTask::invoke);
+            System.err.println("Done! - Site " + page.getSite().getName() + " is indexed");
     }
 
     @SneakyThrows

@@ -9,21 +9,17 @@ public class Site{
     @Id//fixme autoincrement?
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
-    @NotNull //fixme
-//    @Column(columnDefinition = "ENUM('INDEXING', 'INDEXED', 'FAILED')") //fixme work on it now
+    @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     private Status status;
-    @NotNull //fixme
-    @Column(columnDefinition = "DATETIME") //fixme
+    @Column(columnDefinition = "DATETIME", nullable = false) //fixme
     private Date statusTime; //(в случае статуса INDEXING дата и время должны обновляться регулярно
     // при добавлении каждой новой страницы в индекс)
     @Column(columnDefinition = "TEXT")
     private String lastError; //текст ошибки индексации или NULL, если её не было
-    @NotNull //fixme
-    @Column(columnDefinition = "VARCHAR(255)")
+    @Column(columnDefinition = "VARCHAR(255)", nullable = false)
     private String url; //адрес главной страницы сайта
-    @NotNull //fixme
-    @Column(columnDefinition = "VARCHAR(255)")
+    @Column(columnDefinition = "VARCHAR(255)", nullable = false)
     private String name;
 
     public Site() {

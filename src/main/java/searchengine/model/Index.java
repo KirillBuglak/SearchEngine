@@ -9,16 +9,13 @@ public class Index {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
-    @NotNull
     @ManyToOne()
-    @JoinColumn(name = "page_id")
+    @JoinColumn(name = "page_id", nullable = false)
     private Page page;
-    @NotNull
     @ManyToOne()
-    @JoinColumn(name = "lemma_id")
+    @JoinColumn(name = "lemma_id", nullable = false)
     private Lemma lemma;
-    @NotNull
-    @Column(name = "`rank`")
+    @Column(name = "`rank`", nullable = false)
     private float krank;
 
     public Index() {

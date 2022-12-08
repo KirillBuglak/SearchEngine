@@ -2,10 +2,8 @@ package searchengine.controllers;
 
 import lombok.SneakyThrows;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import searchengine.config.SitesList;
 import searchengine.dto.indexPage.IndexPageResponse;
 import searchengine.dto.search.SearchResponse;
 import searchengine.dto.startIndexing.StartIndexingResponse;

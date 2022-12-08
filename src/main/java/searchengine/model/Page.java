@@ -8,17 +8,16 @@ public class Page {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
-    @NotNull
     @ManyToOne()
-    @JoinColumn(name = "site_id")
+    @JoinColumn(name = "site_id", nullable = false)
     private Site site;
     @Column(columnDefinition = "TEXT not null, KEY(path(255))")
     private String path;
-    @NotNull
+    @Column(nullable = false)
     private int code; // код HTTP-ответа(например, 200, 404, 500 или другие)
-    @NotNull
-    @Column(columnDefinition = "MEDIUMTEXT")
+    @Column(columnDefinition = "MEDIUMTEXT", nullable = false)
     private String content; //fixme maybe StringBuilder
+
     public Page() {
     }
 

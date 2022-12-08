@@ -37,7 +37,7 @@ public class Recc extends RecursiveTask<Set<Page>> {
         if (elements != null) {
             elements.forEach(element -> {
                 String link = element.absUrl("href");
-                if (link.contains(page.getPath())//fixme contains param pageUrl or siteUrl
+                if (link.contains(page.getPath())
                         && link.matches(pageRegEx)
                         && (pages.stream().noneMatch(page -> page.getPath().equals(link)))
                 ) {

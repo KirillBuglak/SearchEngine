@@ -8,14 +8,12 @@ public class Lemma {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
-    @NotNull
     @ManyToOne()
-    @JoinColumn(name = "site_id")
+    @JoinColumn(name = "site_id", nullable = false)
     private Site site;
-    @NotNull
-    @Column(columnDefinition = "VARCHAR(255)")
+    @Column(columnDefinition = "VARCHAR(255)", nullable = false)
     private String lemma;
-    @NotNull
+    @Column(nullable = false)
     private int frequency; // — количество страниц, на которых слово встречается хотя бы один раз.
     // Максимальное значение не может превышать общее количество слов на сайте.
 

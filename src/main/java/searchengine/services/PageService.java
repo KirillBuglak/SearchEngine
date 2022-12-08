@@ -1,24 +1,52 @@
 package searchengine.services;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 import searchengine.model.Page;
 import searchengine.model.Site;
+import searchengine.repositories.PageRepository;
 
 import java.util.List;
 import java.util.Set;
 
-public interface PageService {
-    void savePage(Site site, String path, int code, String content);
+@Service
+public class PageService {
+    @Autowired
+    private PageRepository pageRepository;
 
-    void save(Page page);
+    public void savePage(Site site, String path, int code, String content) {
+        if (pageRepository.findByPath(path) == null) {
+            Page page = new Page(site, path, code, content);
+            pageRepository.save(page);
+        }
+    }
 
-    void saveAllPages(Set<Page> pages);
+    public void save(Page page) {
+        pageRepository.save(page);
+    }
 
-    void deleteAllPages();
+    public void saveAllPages(Set<Page> pages) {
+        pageRepository.saveAllAndFlush(pages);
+    }
 
-    void deleteThePageByPath(String path);
+    public void deleteAllPages() {
+        pageRepository.deleteAll();
+    }
 
-    Page getPageByPath(String path);
+    public void deleteThePageByPath(String path) {
+        pageRepository.delete(getPageByPath(path));
+    }
 
-    List<Page> getAllPages();
-    List<Page> getAllPagesBySite(Site site);
+    public Page getPageByPath(String path) {
+        return pageRepository.findByPath(path);
+    }
+
+    public List<Page> getAllPages() {
+        return pageRepository.findAll();
+    }
+
+    public List<Page> getAllPagesBySite(Site site) {
+        return pageRepository.findAllBySite(site);
+    }
+
 }
