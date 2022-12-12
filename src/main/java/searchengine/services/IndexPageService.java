@@ -43,7 +43,7 @@ public class IndexPageService {
             }
             pageService.savePage(siteService.getSiteByPagePath(pagePath), pagePath, statusCode, content);
             lemmaService.saveLemmas(pageService.getPageByPath(pagePath));
-            indexService.saveIndex(pageService.getPageByPath(pagePath));
+            indexService.saveIndexes(pageService.getPageByPath(pagePath));
         } else if (!pagePath.matches(pagePathRegex)) {
             response.setResult(false);
             response.setError("Проверьте правильность ввода адреса страницы");

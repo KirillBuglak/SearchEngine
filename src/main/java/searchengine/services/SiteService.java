@@ -19,6 +19,11 @@ public class SiteService {
     @Autowired
     private IndexService indexService;
 
+    public void updateTimeOfSite(Site site){
+        site.setStatusTime(new Date());
+        siteRepository.save(site);
+    }
+
     public void saveSiteIndexing(String url, String name) {
         if (siteRepository.findByName(name) != null) {//fixme may need to delete it cause stopIndexing may clear sites table
             return;

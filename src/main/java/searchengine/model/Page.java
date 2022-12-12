@@ -2,9 +2,10 @@ package searchengine.model;
 
 import javax.persistence.*;
 import javax.validation.constraints.NotNull;
+import java.util.Comparator;
 
 @Entity
-public class Page {
+public class Page implements Comparable<Page> {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
@@ -17,6 +18,8 @@ public class Page {
     private int code; // код HTTP-ответа(например, 200, 404, 500 или другие)
     @Column(columnDefinition = "MEDIUMTEXT", nullable = false)
     private String content; //fixme maybe StringBuilder
+    @Transient
+    private double relativeRelevance;
 
     public Page() {
     }
@@ -66,5 +69,20 @@ public class Page {
 
     public void setContent(String content) {
         this.content = content;
+    }
+
+    public double getRelativeRelevance() {
+        return relativeRelevance;
+    }
+
+    public void setRelativeRelevance(double relativeRelevance) {
+        this.relativeRelevance = relativeRelevance;
+    }
+
+    @Override
+    public int compareTo(Page p) {
+        return Comparator.comparing(Page::getRelativeRelevance)
+                .thenComparing(Page::getId)
+                .compare(this, p);
     }
 }

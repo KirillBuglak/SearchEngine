@@ -4,24 +4,19 @@ import searchengine.model.Lemma;
 import searchengine.model.Page;
 import searchengine.model.Site;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public class MapTest {
     public static void main(String[] args) {
-        List<Lemma> lemmas = new ArrayList<>();
-        Page page = new Page();
-        page.setId(1);
-        page.setPath("path");
-        page.setSite(new Site("url","name"));
-        page.setCode(200);
-        page.setContent("content");
-        Lemma newLemma = new Lemma(page.getSite(), "lemma", 1);
-        lemmas.add(newLemma);
-        Lemma lemma = lemmas.stream().filter(Lemma -> Lemma.getLemma().equals("lemma")).findFirst().get();
-lemma.setFrequency(3);
-lemmas.forEach(lemma1-> System.out.println(lemma1.getFrequency()));
+        Map<String, Integer> map = new HashMap<>();
+
+        map.put("a", 12);
+        map.put("b", 24);
+        map.put("c", 15);
+        LinkedHashMap<String, Integer> collect = map.entrySet().stream().sorted((o1, o2) -> o2.getValue() - o1.getValue())
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new));
+        System.out.println(collect);
     }
 }

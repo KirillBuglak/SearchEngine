@@ -1,5 +1,6 @@
 package searchengine.services;
 
+import lombok.SneakyThrows;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import searchengine.model.Index;
@@ -23,11 +24,13 @@ public class IndexService {
         return indexRepository.findAll();
     }
 
-    public void saveIndex(Page page) {
-        List<Lemma> lemmasPerPage = lemmaService.getPagesAndLemmas().get(page);
+    @SneakyThrows
+    public void saveIndexes(Page page) {
+        List<Lemma> lemmasPerPage = LemmaService.getPagesAndLemmas().get(page);
         lemmasPerPage.forEach(lemma -> {
             indexRepository.save(new Index(page, lemma, lemma.getFrequency()));//fixme have to save lemmas first before indexes
         });
+        LemmaService.setLemmasPerPageSaved(false);
     }
 
     public void deleteAllIndexes() {

@@ -18,7 +18,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinTask;
 
 @Service
 public class StartIndexingService {
@@ -37,7 +40,6 @@ public class StartIndexingService {
     @Autowired
     private StartIndexingResponse startResponse;
     private List<Thread> threads = new ArrayList<>();
-    private boolean finished;
 
     @SneakyThrows
     public StartIndexingResponse getStartIndexing() {
@@ -59,6 +61,7 @@ public class StartIndexingService {
         }
         return startResponse;
     }
+
     private void startResponseNegative(String errorMessage) {
         startResponse.setResult(false);
         startResponse.setError(errorMessage);
@@ -67,10 +70,6 @@ public class StartIndexingService {
 
     public List<Thread> getThreads() {
         return threads;
-    }
-
-    public boolean isFinished() {
-        return finished;
     }
 
     private void deleteEverything() {
@@ -104,25 +103,23 @@ public class StartIndexingService {
             if (stoppedManually(site, task)) return;
             try {
                 CompletableFuture.supplyAsync(
-                        ()-> {
-            //fixme save status time for site
-            //fixme may need to use fork join pool for lemmas and indexes saves -> the same that created pages -> invokeAll or Smth
-            //save page
-            pageService.save(page);
-            //save page
-            //save lemmas
-            lemmaService.saveLemmas(page);
-            //save lemmas
-            //save indexes
-            indexService.saveIndex(page);
-            //save indexes
+                        () -> {
+                            //fixme save status time for site
+                            //fixme may need to use fork join pool for lemmas and indexes saves -> the same that created pages -> invokeAll or Smth
+                            //save page
+                            pageService.save(page);
+                            //save page
+                            //save lemmas
+                            lemmaService.saveLemmas(page);
+                            //save lemmas
+                            //save indexes
+                            indexService.saveIndexes(page);
+                            //save indexes
                             return true;
-                        },Executors.newWorkStealingPool()).get();
+                        }, Executors.newWorkStealingPool()).get();
             } catch (Exception e) {
-                e.printStackTrace();
-                stoppedExceptionally(site,task);
-            }
-            finally {
+                stoppedExceptionally(site, task);
+            } finally {
                 startResponseNegative(site.getLastError());
             }
         });
@@ -141,22 +138,23 @@ public class StartIndexingService {
             }
         }
     }
+
     @SneakyThrows
     private void mainLogicForTheSite2(Site site) {
         long start = System.currentTimeMillis();
-            ForkJoinPool pool = new ForkJoinPool();
-            ReccWithDBCheck task = new ReccWithDBCheck(new Page(site, site.getUrl(), 0, null),this.pageService,this.lemmaService,this.indexService);
+        ForkJoinPool pool = new ForkJoinPool();
+        ReccWithDBCheck task = new ReccWithDBCheck(new Page(site, site.getUrl(), 0, null), pageService, lemmaService, indexService, siteService);
         try {
-            pool.invoke(task);
-        }catch (Exception e){
+            ForkJoinTask<Void> submit = pool.submit(task);
+            submit.get();
+        } catch (Exception e) {
             e.printStackTrace();
-            stoppedExceptionally(site,task);
+            stoppedExceptionally(site, task);
             return;
-        }
-        finally {
+        } finally {
             startResponseNegative(site.getLastError());
+            pool.shutdown();
         }
-        pool.shutdown();
         System.err.println(site.getUrl() + " - " + pageService.getAllPages().size() + " - SIZE");//fixme not the right SIZE
         siteService.saveSiteWithNewStatus(site, Status.INDEXED);
         System.out.println("Time Spent - " + (System.currentTimeMillis() - start));
@@ -182,11 +180,12 @@ public class StartIndexingService {
         }
         return false;
     }
+
     private void stoppedExceptionally(Site site, ForkJoinTask task) {
-            System.err.println("STOPPED EXCEPTIONALLY - " + Thread.currentThread().getName());
-            task.cancel(true);
-            site.setLastError("Индексация остановлена по причине ошибки");
-            siteService.saveSiteWithNewStatus(site, Status.FAILED);
+        System.err.println("STOPPED EXCEPTIONALLY - " + Thread.currentThread().getName());
+        task.cancel(true);
+        site.setLastError("Индексация остановлена по причине ошибки");
+        siteService.saveSiteWithNewStatus(site, Status.FAILED);
     }
 
 //    private void savePagesHQLWorksOnlyWithEmbeddedId(Set<Page> thisSitePages) {

@@ -7,7 +7,7 @@ import java.io.IOException;
 import java.util.Arrays;
 
 public class MorphologyTest {
-    private static final String text = " ть ул домъий л б в ы бег быстрой двадцатому кинул медленно";
+    private static final String text = " лектории";
     private static final String regex = "[^Ё-ё\\d]";
 
     public static void main(String[] args) throws IOException {

@@ -2,9 +2,10 @@ package searchengine.model;
 
 import javax.persistence.*;
 import javax.validation.constraints.NotNull;
+import java.util.Comparator;
 
 @Entity
-public class Lemma {
+public class Lemma implements Comparable<Lemma> {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
@@ -56,5 +57,12 @@ public class Lemma {
 
     public void setFrequency(int frequency) {
         this.frequency = frequency;
+    }
+
+    @Override
+    public int compareTo(Lemma l) {
+        return Comparator.comparing(Lemma::getFrequency)
+                .thenComparing(Lemma::getLemma)
+                .compare(this, l);
     }
 }

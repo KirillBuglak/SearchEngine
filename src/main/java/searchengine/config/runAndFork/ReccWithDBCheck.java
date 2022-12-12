@@ -6,17 +6,12 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 import searchengine.model.Page;
 import searchengine.services.IndexService;
 import searchengine.services.LemmaService;
 import searchengine.services.PageService;
+import searchengine.services.SiteService;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.RecursiveAction;
 
 //@Component
@@ -24,16 +19,18 @@ public class ReccWithDBCheck extends RecursiveAction {
     private final PageService pageService;
     private final LemmaService lemmaService;
     private final IndexService indexService;
+    private final SiteService siteService;
     private final Page page;
     private int statusCode;
     private final StringBuilder content = new StringBuilder();
     private final String pageRegEx = "https?://([-\\w.+=&?$%]+/?)+";
 
-    public ReccWithDBCheck(Page page, PageService pageService, LemmaService lemmaService, IndexService indexService) {
+    public ReccWithDBCheck(Page page, PageService pageService, LemmaService lemmaService, IndexService indexService, SiteService siteService) {
         this.page = page;
         this.pageService = pageService;
         this.lemmaService = lemmaService;
         this.indexService = indexService;
+        this.siteService = siteService;
     }
 //fixme add services in all constructors
 
@@ -45,37 +42,42 @@ public class ReccWithDBCheck extends RecursiveAction {
 //    }
     @Override
     public void compute() {
-        List<ReccWithDBCheck> tasks = new ArrayList<>();
-        Document document = requestDoc(page.getPath());
+        Document document = requestDoc(page.getSite().getUrl().equals(page.getPath())
+                ? page.getPath() : page.getSite().getUrl() + page.getPath().substring(1));
         //fixme saving to db
-            page.setCode(statusCode);
-            page.setContent(content.toString());
-            pageService.save(page);
-            if (String.valueOf(page.getCode()).charAt(0) != 4 && String.valueOf(page.getCode()).charAt(0) != 5) {//fixme make it easier
-                lemmaService.saveLemmas(page);
-                indexService.saveIndex(page);
-            }
+        page.setCode(statusCode);
+        page.setContent(content.toString());
+        pageService.save(page);
+        if (String.valueOf(page.getCode()).charAt(0) != 4 && String.valueOf(page.getCode()).charAt(0) != 5) {//fixme make it easier
+            lemmaService.saveLemmas(page);
+            indexService.saveIndexes(page);
+            siteService.updateTimeOfSite(page.getSite());
+        }
         //fixme saving to db
-            Elements elements = null;
-            if (document != null) {
-                elements = document.select("a[href]");
-            }
-            if (elements != null) {
-                elements.forEach(element -> {
-                    String link = element.absUrl("href");
-                    if (link.contains(page.getPath()) && link.matches(pageRegEx)
-                            && (pageService.getPageByPath(link) == null)) {
-                        System.out.println(link);
-                        Page newPage = new Page(page.getSite(), link, 0, null);
-                        ReccWithDBCheck task = new ReccWithDBCheck(newPage, this.pageService, this.lemmaService, this.indexService);
-                        task.fork();
-//                        tasks.add(task);
-                        task.invoke();
+        Elements elements = null;
+        if (document != null) {
+            elements = document.select("a[href]");
+        }
+        if (elements != null) {
+            elements.forEach(element -> {
+                String link = element.absUrl("href");
+                String pagePath = null;
+                if (link.contains(page.getPath()) && link.matches(pageRegEx)) {
+                    pagePath = link.substring(page.getSite().getUrl().length() - 1);
+                }
+                if ((pagePath != null && pageService.getPageByPath(pagePath) == null && !link.equals(page.getSite().getUrl()))) {
+                    System.out.println(link);
+                    Page newPage = new Page(page.getSite(), pagePath, 0, null);
+                    ReccWithDBCheck task = new ReccWithDBCheck(newPage, this.pageService, this.lemmaService, this.indexService, siteService);
+                    task.fork();
+                    try {
+                        task.join();
+                    } catch (Exception e) {
+                        e.printStackTrace();
                     }
-                });
-            }
-//            tasks.forEach(ForkJoinTask::invoke);
-            System.err.println("Done! - Site " + page.getSite().getName() + " is indexed");
+                }
+            });
+        }
     }
 
     @SneakyThrows

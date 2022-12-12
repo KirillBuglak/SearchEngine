@@ -48,7 +48,7 @@ public class ReccWithDBCheck extends RecursiveTask<String> {
         page.setContent(content.toString());
         pageService.save(page);
         lemmaService.saveLemmas(page);
-        indexService.saveIndex(page);
+        indexService.saveIndexes(page);
         //fixme saving to db
         Elements elements = null;
         if (document != null) {

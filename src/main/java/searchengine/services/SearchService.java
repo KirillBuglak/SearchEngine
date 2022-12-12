@@ -14,6 +14,7 @@ import searchengine.model.Site;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,6 +27,7 @@ public class SearchService {
     private IndexService indexService;
     private final List<SearchPageData> dataList = new ArrayList<>();
     private List<String> foundLemmasFromDB;
+
     public SearchResponse getSearch(String query, String searchSiteUrl) {//fixme SearchResponse getSearch(String query, String searchSiteUrl){return SearchResponse getSearch(String query, String searchSiteUrl, offset = 0, limit = 20) }
         SearchResponse response = new SearchResponse();
 
@@ -94,29 +96,44 @@ public class SearchService {
             dataList.add(data);
         });
     }
+
     private StringBuilder buildSnippet(Page page) {//fixme work on firstWord and contentWord
         StringBuilder snippet = new StringBuilder();
 
-        List<String> pageLemmasForSearch = lemmaService.getPagesAndLemmas().entrySet().stream()
+        HashMap<Page, List<Lemma>> pagesAndLemmas = lemmaService.getPagesAndLemmas();
+
+        List<String> allPageLemmasForSearch = pagesAndLemmas.entrySet().stream()
                 .filter(entry -> entry.getKey().getPath().equals(page.getPath()))
                 .map(Map.Entry::getValue).flatMap(List::stream)
-                .filter(lemma -> lemma.getFrequency()<=50)
                 .map(Lemma::getLemma).toList();
 
-        List<String> foundLemmas = foundLemmasFromDB.stream().filter(pageLemmasForSearch::contains).toList();
-        List<String> contentWords = lemmaService.getFilteredWordAndLemma(page.getContent()).entrySet().stream()
-                .filter(entry -> foundLemmas.contains(entry.getValue())).map(entry -> entry.getKey()).toList();
+        Predicate<String> filterTooCommonLemmas = fLemma -> {
+            int numberOfPagesContainingFLemma = pagesAndLemmas.values().stream()
+                    .map(lemmaList -> lemmaList.stream().map(Lemma::getLemma).toList())
+                    .filter(lemmaList -> lemmaList.contains(fLemma)).toList().size();
+            return (double) numberOfPagesContainingFLemma / pagesAndLemmas.size() < 0.8;//fixme work on this number
+        };
+
+        List<Lemma> foundLemmas = lemmaService.getLemmasByListOfWords(foundLemmasFromDB.stream()
+                .filter(allPageLemmasForSearch::contains)
+                .filter(filterTooCommonLemmas)
+                .toList());
+
+        List<String> contentWords = lemmaService.getFilteredWordAndLemma(page.getContent()).entrySet().stream()//fixme work on getFilteredWordAndLemmaS?
+                .filter(entry -> foundLemmas.stream().map(Lemma::getLemma)
+                .toList().contains(entry.getValue())).map(Map.Entry::getKey).toList();
+
         String pageContent = page.getContent();
 
-        contentWords.forEach(contentWord->{
-        int start = pageContent.toLowerCase().indexOf(contentWord);
-        int finish = start + contentWord.length();
-            int symbolsBeforeStart = Math.max(pageContent.toLowerCase().indexOf(contentWord) - 20, 0);
-            int symbolsAfterFinish = Math.min(start + contentWord.length() + 200, pageContent.length() - 1);
-        String substring = pageContent.substring(start- symbolsBeforeStart, finish + symbolsAfterFinish)
-                .replaceAll(pageContent.substring(start, finish),
-                        "<b>" + pageContent.substring(start, finish) + "</b>");
-        snippet.append("...").append(substring).append("...");
+        contentWords.forEach(contentWord -> {
+            int start = pageContent.toLowerCase().indexOf(contentWord);
+            int finish = start + contentWord.length();
+            int substringStart = Math.max(pageContent.toLowerCase().indexOf(contentWord) - 20, 0);
+            int substringFinish = Math.min(start + contentWord.length() + 200, pageContent.length() - 1);
+            String substring = pageContent.substring(substringStart, substringFinish)
+                    .replaceAll(pageContent.substring(start, finish),
+                            "<b>" + pageContent.substring(start, finish) + "</b>");
+            snippet.append("...").append(substring).append("...");
         });
 
         return snippet;
