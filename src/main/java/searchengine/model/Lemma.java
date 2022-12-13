@@ -15,9 +15,7 @@ public class Lemma implements Comparable<Lemma> {
     @Column(columnDefinition = "VARCHAR(255)", nullable = false)
     private String lemma;
     @Column(nullable = false)
-    private int frequency; // — количество страниц, на которых слово встречается хотя бы один раз.
-    // Максимальное значение не может превышать общее количество слов на сайте.
-
+    private int frequency;
 
     public Lemma() {}
 

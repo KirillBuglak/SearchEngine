@@ -1,6 +1,5 @@
 package searchengine.services;
 
-import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import org.apache.lucene.morphology.LuceneMorphology;
 import org.apache.lucene.morphology.russian.RussianLuceneMorphology;
@@ -10,23 +9,49 @@ import searchengine.model.Lemma;
 import searchengine.model.Page;
 import searchengine.repositories.LemmaRepository;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.function.Predicate;
 
 @Service
-@RequiredArgsConstructor
 public class LemmaService {
-
-    @Autowired
-    private PageService pageService;//fixme may need to delete it cause of style - use only lemmaRepository
-    @Autowired
-    private LemmaRepository lemmaRepository;
+    private final PageService pageService;//fixme may need to delete it cause of style - use only lemmaRepository
+    private final LemmaRepository lemmaRepository;
     private static final HashMap<Page, List<Lemma>> pagesAndLemmas;
-    private static boolean lemmasPerPageSaved;
+    private final String regex = "[^Ё-ё\\d]";
+    private static final LuceneMorphology morphology;
+    private static final Predicate<String> neededWords;
+    private static final Predicate<String> realWords;//fixme work on it ть
 
     static {
         pagesAndLemmas = new HashMap<>();
-        lemmasPerPageSaved = false;
+        try {
+            morphology = new RussianLuceneMorphology();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        neededWords = word -> (morphology.getMorphInfo(word).stream()
+                .anyMatch(mInfo ->
+                        (mInfo.contains("|A") && mInfo.length() > 2) //fixme length is variable here
+                                || mInfo.contains("|Y")
+                                || mInfo.contains("|i")
+                                || (mInfo.contains("|a") && mInfo.length() > 3)
+                                || mInfo.contains("|j")));
+        realWords = word -> {
+            List<String> normalForms;
+            try {
+                normalForms = morphology.getNormalForms(word);
+            } catch (Exception e) {
+                normalForms = null;
+            }
+            return normalForms != null;
+        };
+    }
+
+    @Autowired
+    public LemmaService(PageService pageService, LemmaRepository lemmaRepository) {
+        this.pageService = pageService;
+        this.lemmaRepository = lemmaRepository;
     }
 
     @SneakyThrows
@@ -38,18 +63,19 @@ public class LemmaService {
                     .filter(entry -> entry.getValue().stream().map(Lemma::getLemma).toList().contains(lemma))
                     .toList().size();
             Lemma newLemma = new Lemma(page.getSite(), lemma, 1);
-            Lemma repositoryLemma = lemmaRepository.findByLemmaAndSite(lemma, page.getSite());
-            Optional<Lemma> perPageOptional = lemmasPerPage.stream().filter(Lemma -> Lemma.getLemma().equals(lemma)).findFirst();
-            if (repositoryLemma != null) {
-                repositoryLemma.setFrequency(numberOfPagesForLemma + 1);
-                lemmaRepository.save(repositoryLemma);
+            Lemma dbLemma = lemmaRepository.findByLemmaAndSite(lemma, page.getSite());
+            Optional<Lemma> perPageOptional = lemmasPerPage.stream().filter(Lemma -> Lemma.getLemma().equals(lemma))
+                    .findFirst();
+            if (dbLemma != null) {
+                dbLemma.setFrequency(numberOfPagesForLemma + 1);
+                lemmaRepository.save(dbLemma);
                 if (perPageOptional.isPresent()) {
                     Lemma perPageLemma = perPageOptional.get();
                     lemmasPerPage.remove(perPageLemma);
                     perPageLemma.setFrequency(perPageLemma.getFrequency() + 1);
                     lemmasPerPage.add(perPageLemma);
                 } else {
-                    lemmasPerPage.add(repositoryLemma);
+                    lemmasPerPage.add(dbLemma);
                 }
             } else {
                 lemmaRepository.save(newLemma);
@@ -61,51 +87,14 @@ public class LemmaService {
 
     @SneakyThrows
     public List<String> getFilteredLemmas(String text) {
-        String regex = "[^Ё-ё\\d]";
-        LuceneMorphology morphology = new RussianLuceneMorphology();
-        Predicate<String> neededWords = word -> (morphology.getMorphInfo(word).stream()
-                .anyMatch(mInfo ->
-                        (mInfo.contains("|A") && mInfo.length() > 2) //fixme length is variable here
-                                || mInfo.contains("|Y")
-                                || mInfo.contains("|i")
-                                || (mInfo.contains("|a") && mInfo.length() > 3)
-                                || mInfo.contains("|j")));
-        Predicate<String> realWords = word -> {
-            List<String> normalForms;
-            try {
-                normalForms = morphology.getNormalForms(word);
-            } catch (Exception e) {
-                normalForms = null;
-            }
-            return normalForms != null;
-        };
         ArrayList<String> words = new ArrayList<>(Arrays.stream(text.trim().toLowerCase().split(regex))
-                .filter(realWords).filter(neededWords).toList());//fixme has to get rid of 5fr7668 type of input
+                .filter(realWords).filter(neededWords).toList());
 
         List<String> lemmas = words.stream().map(morphology::getNormalForms).flatMap(List::stream).toList();
         return lemmas;
     }
 
-    @SneakyThrows
     public HashMap<String, String> getFilteredWordAndLemma(String text) {
-        String regex = "[^Ё-ё\\d]";
-        LuceneMorphology morphology = new RussianLuceneMorphology();
-        Predicate<String> neededWords = word -> (morphology.getMorphInfo(word).stream()
-                .anyMatch(mInfo ->
-                        (mInfo.contains("|A") && mInfo.length() > 2) //fixme length is variable here
-                                || mInfo.contains("|Y")
-                                || mInfo.contains("|i")
-                                || (mInfo.contains("|a") && mInfo.length() > 3)
-                                || mInfo.contains("|j")));
-        Predicate<String> realWords = word -> {
-            List<String> normalForms;
-            try {
-                normalForms = morphology.getNormalForms(word);
-            } catch (Exception e) {
-                normalForms = null;
-            }
-            return normalForms != null;
-        };
         HashMap<String, String> wordAndLemma = new HashMap<>();
         ArrayList<String> words = new ArrayList<>(Arrays.stream(text.trim().toLowerCase().split(regex))
                 .filter(realWords).filter(neededWords).toList());
@@ -114,7 +103,7 @@ public class LemmaService {
     }
 
     public List<Lemma> getLemmasByListOfWords(List<String> words) {//fixme need distinct lemmas
-        return words.stream().map(word -> lemmaRepository.findByLemma(word)).distinct().flatMap(List::stream)
+        return words.stream().map(lemmaRepository::findByLemma).distinct().flatMap(List::stream)
                 .sorted().toList();
     }
 
@@ -136,11 +125,9 @@ public class LemmaService {
         }
         return false;
     }
-
     public void deleteAllLemmas() {
         lemmaRepository.deleteAll();
     }
-
     public void deleteLemmasByPagePath(String pagePath) {
         Page page = pageService.getPageByPath(pagePath);
         List<String> pageLemmas = getFilteredLemmas(pageService.getPageByPath(pagePath).getContent());
@@ -154,26 +141,7 @@ public class LemmaService {
             }
         });
     }
-
-    public List<Lemma> getAllLemmas() {
-        return lemmaRepository.findAll();
-    }
-
     public List<Lemma> getLemmasBySiteUrl(String siteUrl) {
         return lemmaRepository.findBySiteUrl(siteUrl);
-    }
-
-    public List<Lemma> getLemmasByPagePath(String pagePath) {
-        int start = pagePath.indexOf("//") + 2;//fixme may need regex
-        int end = pagePath.indexOf("/", start);
-        return lemmaRepository.findBySiteUrl(pagePath.substring(0, end));
-    }
-
-    public static boolean isLemmasPerPageSaved() {
-        return lemmasPerPageSaved;
-    }
-
-    public static void setLemmasPerPageSaved(boolean lemmasPerPageSaved) {
-        LemmaService.lemmasPerPageSaved = lemmasPerPageSaved;
     }
 }

@@ -12,13 +12,12 @@ public class Site{
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     private Status status;
-    @Column(columnDefinition = "DATETIME", nullable = false) //fixme
-    private Date statusTime; //(в случае статуса INDEXING дата и время должны обновляться регулярно
-    // при добавлении каждой новой страницы в индекс)
+    @Column(columnDefinition = "DATETIME", nullable = false)
+    private Date statusTime;
     @Column(columnDefinition = "TEXT")
     private String lastError; //текст ошибки индексации или NULL, если её не было
     @Column(columnDefinition = "VARCHAR(255)", nullable = false)
-    private String url; //адрес главной страницы сайта
+    private String url;
     @Column(columnDefinition = "VARCHAR(255)", nullable = false)
     private String name;
 

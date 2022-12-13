@@ -1,6 +1,6 @@
 package searchengine.services;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Service;
 import searchengine.model.Page;
 import searchengine.model.Site;
@@ -10,9 +10,14 @@ import java.util.List;
 import java.util.Set;
 
 @Service
+@ConfigurationProperties(prefix = "jsoup-settings")
 public class PageService {
-    @Autowired
-    private PageRepository pageRepository;
+    private String userAgent;
+    private String referrer;
+    private final PageRepository pageRepository;
+    public PageService(PageRepository pageRepository) {
+        this.pageRepository = pageRepository;
+    }
 
     public void savePage(Site site, String path, int code, String content) {
         if (pageRepository.findByPath(path) == null) {
@@ -49,4 +54,19 @@ public class PageService {
         return pageRepository.findAllBySite(site);
     }
 
+    public String getUserAgent() {
+        return userAgent;
+    }
+
+    public void setUserAgent(String userAgent) {
+        this.userAgent = userAgent;
+    }
+
+    public String getReferrer() {
+        return referrer;
+    }
+
+    public void setReferrer(String referrer) {
+        this.referrer = referrer;
+    }
 }

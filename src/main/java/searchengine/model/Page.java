@@ -15,7 +15,7 @@ public class Page implements Comparable<Page> {
     @Column(columnDefinition = "TEXT not null, KEY(path(255))")
     private String path;
     @Column(nullable = false)
-    private int code; // код HTTP-ответа(например, 200, 404, 500 или другие)
+    private int code;
     @Column(columnDefinition = "MEDIUMTEXT", nullable = false)
     private String content; //fixme maybe StringBuilder
     @Transient
@@ -26,7 +26,7 @@ public class Page implements Comparable<Page> {
 
     public Page(Site site, String path, int code, String content) {
         this.site = site;
-        this.path = path;
+        this.path = path.equals(site.getUrl()) ? "/" : path;
         this.code = code;
         this.content = content;
     }
@@ -48,7 +48,7 @@ public class Page implements Comparable<Page> {
     }
 
     public String getPath() {
-        return path;
+        return path.equals("/") ? getSite().getUrl() : getSite().getUrl() + path.substring(1);
     }
 
     public void setPath(String path) {

@@ -2,7 +2,6 @@ package searchengine.services;
 
 import lombok.SneakyThrows;
 import org.jsoup.Jsoup;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import searchengine.dto.search.SearchPageData;
 import searchengine.dto.search.SearchResponse;
@@ -19,21 +18,24 @@ import java.util.stream.Collectors;
 
 @Service
 public class SearchService {
-    @Autowired
-    private LemmaService lemmaService;
-    @Autowired
-    private SiteService siteService;
-    @Autowired
-    private IndexService indexService;
+    private final LemmaService lemmaService;
+    private final SiteService siteService;
+    private final IndexService indexService;
     private final List<SearchPageData> dataList = new ArrayList<>();
     private List<String> foundLemmasFromDB;
+
+    public SearchService(LemmaService lemmaService, SiteService siteService, IndexService indexService) {
+        this.lemmaService = lemmaService;
+        this.siteService = siteService;
+        this.indexService = indexService;
+    }
 
     public SearchResponse getSearch(String query, String searchSiteUrl) {//fixme SearchResponse getSearch(String query, String searchSiteUrl){return SearchResponse getSearch(String query, String searchSiteUrl, offset = 0, limit = 20) }
         SearchResponse response = new SearchResponse();
 
         Site searchSite = siteService.getSiteByURL(searchSiteUrl);
         foundLemmasFromDB = lemmaService.getFilteredLemmas(query).stream()
-                .filter(lemma -> lemmaService.isLemmaPresent(lemma)).toList();
+                .filter(lemmaService::isLemmaPresent).toList();
 
         response.setResult(foundLemmasFromDB.size() != 0);
 
@@ -85,7 +87,7 @@ public class SearchService {
     private void addSearchPageDataInfo(LinkedHashMap<Page, Float> pageRelInfo) {
         pageRelInfo.forEach((page, relevance) -> {
             StringBuilder snippet = buildSnippet(page);
-            SearchPageData data = null;
+            SearchPageData data;
             try {
                 data = new SearchPageData(page.getSite().getUrl(),
                         page.getSite().getName(), page.getPath(), Jsoup.connect(page
@@ -100,7 +102,7 @@ public class SearchService {
     private StringBuilder buildSnippet(Page page) {//fixme work on firstWord and contentWord
         StringBuilder snippet = new StringBuilder();
 
-        HashMap<Page, List<Lemma>> pagesAndLemmas = lemmaService.getPagesAndLemmas();
+        HashMap<Page, List<Lemma>> pagesAndLemmas = LemmaService.getPagesAndLemmas();
 
         List<String> allPageLemmasForSearch = pagesAndLemmas.entrySet().stream()
                 .filter(entry -> entry.getKey().getPath().equals(page.getPath()))

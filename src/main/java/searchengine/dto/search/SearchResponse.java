@@ -1,37 +1,14 @@
 package searchengine.dto.search;
 
+import searchengine.dto.CommonResponse;
+
 import java.util.List;
 
-public class SearchResponse {
-    private boolean result;
-    private String error;
+public class SearchResponse extends CommonResponse {
     private int count;
-    private List<SearchPageData> data;
+    private List<SearchPageData> data;//fixme sort it by relevance
 
     public SearchResponse() {
-    }
-
-    public SearchResponse(boolean result, String error, int count, List<SearchPageData> data) {
-        this.result = result;
-        this.error = error;
-        this.count = count;
-        this.data = data;
-    }
-
-    public boolean isResult() {
-        return result;
-    }
-
-    public void setResult(boolean result) {
-        this.result = result;
-    }
-
-    public String getError() {
-        return error;
-    }
-
-    public void setError(String error) {
-        this.error = error;
     }
 
     public int getCount() {

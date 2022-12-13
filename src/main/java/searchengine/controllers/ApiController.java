@@ -1,14 +1,13 @@
 package searchengine.controllers;
 
 import lombok.SneakyThrows;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import searchengine.dto.indexPage.IndexPageResponse;
+import searchengine.dto.IndexPageResponse;
+import searchengine.dto.StartIndexingResponse;
+import searchengine.dto.StopIndexingResponse;
 import searchengine.dto.search.SearchResponse;
-import searchengine.dto.startIndexing.StartIndexingResponse;
 import searchengine.dto.statistics.StatisticsResponse;
-import searchengine.dto.stopIndexing.StopIndexingResponse;
 import searchengine.services.*;
 
 import javax.validation.Valid;
@@ -16,18 +15,23 @@ import javax.validation.Valid;
 @RestController
 @RequestMapping("/api")
 public class ApiController {
+    private final StatisticsService statisticsService;
+    private final SearchService searchService;
+    private final IndexPageService indexPageService;
+    private final StopIndexingService stopIndexingService;
+    private final StartIndexingService startIndexingService;
 
-    @Autowired
-    private StatisticsService statisticsService;
-    @Autowired
-    private SearchService searchService;
-    @Autowired
-    private IndexPageService indexPageService;
-    @Autowired
-    private StopIndexingService stopIndexingService;
-    @Autowired
-    private StartIndexingService startIndexingService;
-
+    public ApiController(StatisticsService statisticsService,
+                         SearchService searchService,
+                         IndexPageService indexPageService,
+                         StopIndexingService stopIndexingService,
+                         StartIndexingService startIndexingService) {
+        this.statisticsService = statisticsService;
+        this.searchService = searchService;
+        this.indexPageService = indexPageService;
+        this.stopIndexingService = stopIndexingService;
+        this.startIndexingService = startIndexingService;
+    }
 
     @GetMapping("/statistics")
     public ResponseEntity<StatisticsResponse> statistics() {//fixme ResponseEntity has Status(200) meths

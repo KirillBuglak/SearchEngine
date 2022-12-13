@@ -1,19 +1,23 @@
 package searchengine.services;
 
 import lombok.SneakyThrows;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import searchengine.dto.startIndexing.StartIndexingResponse;
-import searchengine.dto.stopIndexing.StopIndexingResponse;
+import searchengine.dto.StartIndexingResponse;
+import searchengine.dto.StopIndexingResponse;
 
 @Service
 public class StopIndexingService {
-    @Autowired
-    private StopIndexingResponse stopResponse;
-    @Autowired
-    private StartIndexingResponse startResponse;
-    @Autowired
-    private StartIndexingService startIndexingService;
+    private final StopIndexingResponse stopResponse;
+    private final StartIndexingResponse startResponse;
+    private final StartIndexingService startIndexingService;
+
+    public StopIndexingService(StopIndexingResponse stopResponse,
+                               StartIndexingResponse startResponse,
+                               StartIndexingService startIndexingService) {
+        this.stopResponse = stopResponse;
+        this.startResponse = startResponse;
+        this.startIndexingService = startIndexingService;
+    }
 
     @SneakyThrows
     public StopIndexingResponse getStopIndexing() {

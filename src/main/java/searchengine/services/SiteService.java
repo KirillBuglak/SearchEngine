@@ -1,6 +1,5 @@
 package searchengine.services;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import searchengine.model.Index;
 import searchengine.model.Site;
@@ -12,12 +11,15 @@ import java.util.List;
 
 @Service
 public class SiteService {
-    @Autowired
-    private SiteRepository siteRepository;
-    @Autowired
-    private PageService pageService;
-    @Autowired
-    private IndexService indexService;
+    private final SiteRepository siteRepository;
+    private final PageService pageService;
+    private final IndexService indexService;
+
+    public SiteService(SiteRepository siteRepository, PageService pageService, IndexService indexService) {
+        this.siteRepository = siteRepository;
+        this.pageService = pageService;
+        this.indexService = indexService;
+    }
 
     public void updateTimeOfSite(Site site){
         site.setStatusTime(new Date());
@@ -47,7 +49,7 @@ public class SiteService {
 
     private boolean areAllPagesIndexed(Site site) {
         List<Index> indexes = pageService.getAllPagesBySite(site).stream()
-                .map(page -> indexService.getAllIndexesByPage(page)).flatMap(List::stream).toList();
+                .map(indexService::getAllIndexesByPage).flatMap(List::stream).toList();
         return indexes.size() != 0 && indexes.stream().map(Index::getPage).distinct().toList().size()
                 == pageService.getAllPagesBySite(site).size();//fixme may need to check it with sites.size()
     }
