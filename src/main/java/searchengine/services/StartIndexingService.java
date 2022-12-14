@@ -101,7 +101,7 @@ public class StartIndexingService {
             startResponseNegative(site.getLastError());
             pool.shutdown();
         }
-        System.err.println(site.getUrl() + " - " + pageService.getAllPages().size() + " - SIZE");//fixme not the right SIZE
+        System.err.println(site.getUrl() + " - " + pageService.getAllPages().size() + " - SIZE");
         siteService.saveSiteWithNewStatus(site, Status.INDEXED);
         System.out.println("Time Spent - " + (System.currentTimeMillis() - start));
         if (isaLastSite(site)) {

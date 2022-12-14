@@ -38,7 +38,7 @@ public class PageLemmaIndexDBSave extends RecursiveAction {
     @Override
     public void compute() {
         Document document = requestDoc(page.getPath());
-        //fixme saving to db
+        //saving to db
         page.setCode(statusCode);
         page.setContent(content.toString());
         pageService.save(page);
@@ -47,7 +47,7 @@ public class PageLemmaIndexDBSave extends RecursiveAction {
             indexService.saveIndexes(page);
             siteService.updateTimeOfSite(page.getSite());
         }
-        //fixme saving to db
+        //saving to db
         Elements elements = null;
         if (document != null) {
             elements = document.select("a[href]");
@@ -76,7 +76,7 @@ public class PageLemmaIndexDBSave extends RecursiveAction {
     }
 
     @SneakyThrows
-    private Document requestDoc(String pageUrl) {//fixme may need to set code and content here for this.page
+    private Document requestDoc(String pageUrl) {
         //todo may need to sleep here for a while
         Connection connection = Jsoup.connect(pageUrl)
                 .userAgent(pageService.getUserAgent())

@@ -6,7 +6,7 @@ import java.util.Date;
 
 @Entity
 public class Site{
-    @Id//fixme autoincrement?
+    @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
     @Column(nullable = false)

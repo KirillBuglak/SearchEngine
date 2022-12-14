@@ -82,7 +82,7 @@ public class LemmaService {
                 lemmasPerPage.add(lemmaRepository.findByLemmaAndSite(lemma,page.getSite()));
             }
         });
-        pagesAndLemmas.put(page, lemmasPerPage);//fixme have to set id's to lemmas in this map
+        pagesAndLemmas.put(page, lemmasPerPage);
     }
 
     @SneakyThrows
@@ -102,7 +102,7 @@ public class LemmaService {
         return wordAndLemma;
     }
 
-    public List<Lemma> getLemmasByListOfWords(List<String> words) {//fixme need distinct lemmas
+    public List<Lemma> getLemmasByListOfWords(List<String> words) {
         return words.stream().map(lemmaRepository::findByLemma).distinct().flatMap(List::stream)
                 .sorted().toList();
     }

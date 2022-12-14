@@ -24,7 +24,7 @@ public class IndexService {
     public void saveIndexes(Page page) {
         List<Lemma> lemmasPerPage = LemmaService.getPagesAndLemmas().get(page);
         lemmasPerPage.forEach(lemma -> {
-            indexRepository.save(new Index(page, lemma, lemma.getFrequency()));//fixme have to save lemmas first before indexes
+            indexRepository.save(new Index(page, lemma, lemma.getFrequency()));
         });
     }
 

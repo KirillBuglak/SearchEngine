@@ -6,7 +6,7 @@ import java.util.List;
 
 public class SearchResponse extends CommonResponse {
     private int count;
-    private List<SearchPageData> data;//fixme sort it by relevance
+    private List<SearchPageData> data;
 
     public SearchResponse() {
     }

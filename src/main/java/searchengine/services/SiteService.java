@@ -27,7 +27,7 @@ public class SiteService {
     }
 
     public void saveSiteIndexing(String url, String name) {
-        if (siteRepository.findByName(name) != null) {//fixme may need to delete it cause stopIndexing may clear sites table
+        if (siteRepository.findByName(name) != null) {//fixme may need to delete it cause stopIndexing may clear sites' table
             return;
         }
         siteRepository.save(new Site(url, name));
@@ -51,15 +51,14 @@ public class SiteService {
         List<Index> indexes = pageService.getAllPagesBySite(site).stream()
                 .map(indexService::getAllIndexesByPage).flatMap(List::stream).toList();
         return indexes.size() != 0 && indexes.stream().map(Index::getPage).distinct().toList().size()
-                == pageService.getAllPagesBySite(site).size();//fixme may need to check it with sites.size()
+                == pageService.getAllPagesBySite(site).size();
     }
 
     public boolean isThereTheSite(String pagePath) {
         if (pagePath.length() == 0) {
             return false;
         }
-        int start = pagePath.indexOf("//") + 2;//fixme may need regex
-        int end = pagePath.indexOf("/", start);
+        int end = pagePath.indexOf("/", pagePath.indexOf("//") + 2);
         return siteRepository.findByUrl(pagePath.substring(0, end)) != null;
     }
 
@@ -68,8 +67,7 @@ public class SiteService {
     }
 
     public Site getSiteByPagePath(String pagePath) {
-        int start = pagePath.indexOf("//") + 2;//fixme may need regex
-        int end = pagePath.indexOf("/", start);
+    int end = pagePath.indexOf("/", pagePath.indexOf("//") + 2);
         return siteRepository.findByUrl(pagePath.substring(0, end));
     }
 

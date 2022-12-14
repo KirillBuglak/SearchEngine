@@ -1,7 +1,7 @@
 package searchengine.services;
 
-import lombok.SneakyThrows;
 import org.jsoup.Jsoup;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Service;
 import searchengine.dto.search.SearchPageData;
 import searchengine.dto.search.SearchResponse;
@@ -12,16 +12,17 @@ import searchengine.model.Site;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 @Service
+@ConfigurationProperties(prefix = "search-service")
 public class SearchService {
+
+    private double percentOfPages;
     private final LemmaService lemmaService;
     private final SiteService siteService;
     private final IndexService indexService;
-    private final List<SearchPageData> dataList = new ArrayList<>();
     private List<String> foundLemmasFromDB;
 
     public SearchService(LemmaService lemmaService, SiteService siteService, IndexService indexService) {
@@ -37,36 +38,31 @@ public class SearchService {
         foundLemmasFromDB = lemmaService.getFilteredLemmas(query).stream()
                 .filter(lemmaService::isLemmaPresent).toList();
 
-        response.setResult(foundLemmasFromDB.size() != 0);
-
         List<Integer> lemmasIds = lemmaService.getLemmasByListOfWords(foundLemmasFromDB).stream().map(Lemma::getId)
                 .distinct().toList();
         List<Index> allIndexesByLemmaIds = indexService.getAllIndexesByLemmaIds(lemmasIds);
         List<Index> searchSiteIndexes = allIndexesByLemmaIds.stream().filter(index -> index.getPage().getSite()
                 .getUrl().equals(searchSiteUrl)).toList();
 
-        boolean searchSiteHasResults = searchSiteIndexes.size() != 0;
-        if (response.isResult() && searchSite == null) {
-            addSearchPageDataInfo(getPageRelInfo(allIndexesByLemmaIds));
+        boolean searchSiteHasResults = searchSiteIndexes.size() != 0;//fixme work down from here - make it easier
+        if (allIndexesByLemmaIds.size() != 0 && searchSite == null && addSearchPageDataInfo(getPageRelInfo(allIndexesByLemmaIds)) != null) {
+            response.setData(addSearchPageDataInfo(getPageRelInfo(allIndexesByLemmaIds)));
             response.setCount(indexService.indexesCountByLemmasIds(lemmasIds));
-            response.setData(dataList);
-        } else if (
-//                response.isResult() &&
-                searchSite != null && searchSiteHasResults) {
-            addSearchPageDataInfo(getPageRelInfo(searchSiteIndexes));
+            response.setResult(response.getCount() != 0);
+        } else if (searchSite != null && searchSiteHasResults && addSearchPageDataInfo(getPageRelInfo(searchSiteIndexes)) != null) {
+            response.setData(addSearchPageDataInfo(getPageRelInfo(searchSiteIndexes)));
             response.setCount(searchSiteIndexes.size());
-            response.setData(dataList);
-        } else if (query.isBlank()) { //fixme have to deal with case when query is null
+            response.setResult(response.getCount() != 0);
+        } else if (query.isBlank()) {
             response.setError("Задан пустой поисковый запрос");
-        } else {
+        } else {//fixme work on this check
             response.setError("По вашему запросу ничего не нашлось");
         }
         return response;
     }
 
-    private LinkedHashMap<Page, Float> getPageRelInfo(List<Index> indexesList) {
-        Map<Page, Float> pageAndAbsRel = new ConcurrentHashMap<>();
-        LinkedHashMap<Page, Float> sortedPageAndRelatRel = new LinkedHashMap<>();
+    private Map<Page, Float> getPageRelInfo(List<Index> indexesList) {
+        HashMap<Page, Float> pageAndAbsRel = new HashMap<>();
         indexesList.forEach(index -> {
             Page pageFromIndex = index.getPage();
             if (pageAndAbsRel.containsKey(pageFromIndex)) {
@@ -75,18 +71,18 @@ public class SearchService {
                 pageAndAbsRel.put(pageFromIndex, index.getRank());
             }
         });
-        LinkedHashMap<Page, Float> sortedPageAndAbsRel = pageAndAbsRel.entrySet().stream()
-                .sorted((o1, o2) -> (int) (o2.getValue() - o1.getValue()))
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new));
-        Float divisor = sortedPageAndAbsRel.values().iterator().next();
-        sortedPageAndAbsRel.forEach((k, v) -> sortedPageAndRelatRel.put(k, v / divisor));
-        return sortedPageAndRelatRel;
+        Float divisor = pageAndAbsRel.values().stream().reduce(Math::max).get();
+        return pageAndAbsRel.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue() / divisor));
     }
 
-    @SneakyThrows
-    private void addSearchPageDataInfo(LinkedHashMap<Page, Float> pageRelInfo) {
+    private List<SearchPageData> addSearchPageDataInfo(Map<Page, Float> pageRelInfo) {
+        List<SearchPageData> dataList = new ArrayList<>();
         pageRelInfo.forEach((page, relevance) -> {
             StringBuilder snippet = buildSnippet(page);
+            if (snippet.length() == 0) {//fixme may also have the same snippets
+                return;
+            }
             SearchPageData data;
             try {
                 data = new SearchPageData(page.getSite().getUrl(),
@@ -97,11 +93,52 @@ public class SearchService {
             }
             dataList.add(data);
         });
+        Collections.sort(dataList);
+        return dataList.size() == 0 ? null : dataList;
     }
 
-    private StringBuilder buildSnippet(Page page) {//fixme work on firstWord and contentWord
+    private StringBuilder buildSnippet(Page page) {//fixme work on all words in snippet
         StringBuilder snippet = new StringBuilder();
 
+        String pageContent = page.getContent();
+
+        List<Lemma> foundFilteredLemmas = getFoundFilteredLemmas(page);
+
+        List<String> contentWordsSorted = getContentWordsSorted(foundFilteredLemmas, pageContent);
+
+        contentWordsSorted.forEach(contentWord -> {
+            int pageStart = pageContent.toLowerCase().indexOf(contentWord);
+            int pageFinish = pageStart + contentWord.length();
+            int snippetStart = snippet.toString().toLowerCase().indexOf(contentWord);
+            int snippetFinish = snippetStart + contentWord.length();
+            int substringStart = Math.max(pageContent.toLowerCase().indexOf(contentWord) - 20, 0);
+            int substringFinish = Math.min(pageStart + contentWord.length() + (snippet.length() > 200 ? 20 : 100),
+                    pageContent.length() - 1);
+            String boldWord = "<b>" + pageContent.substring(pageStart, pageFinish) + "</b>";
+
+            if (snippet.toString().toLowerCase().contains(contentWord)) {
+                snippet.replace(snippetStart, snippetFinish, boldWord)
+                        .delete(snippet.toString().indexOf(boldWord) + boldWord.length(), snippet.length() - 1)
+                        .append(pageContent, pageFinish, substringFinish)
+                        .append("...");
+            } else {
+                String substring = pageContent.substring(substringStart, substringFinish)
+                        .replaceAll(pageContent.substring(pageStart, pageFinish),
+                                boldWord);
+                snippet.append(snippet.length() > 0 ? "" : "...").append(substring).append("...");
+            }
+        });
+        return snippet;
+    }
+
+    private List<String> getContentWordsSorted(List<Lemma> foundLemmas, String pageContent) {
+        return lemmaService.getFilteredWordAndLemma(pageContent).entrySet().stream()//fixme work on getFilteredWordAndLemmaS?
+                .filter(entry -> foundLemmas.stream().map(Lemma::getLemma)
+                        .toList().contains(entry.getValue())).map(Map.Entry::getKey)
+                .sorted(Comparator.comparingInt(w -> pageContent.toLowerCase().indexOf(w))).toList();
+    }
+
+    private List<Lemma> getFoundFilteredLemmas(Page page) {
         HashMap<Page, List<Lemma>> pagesAndLemmas = LemmaService.getPagesAndLemmas();
 
         List<String> allPageLemmasForSearch = pagesAndLemmas.entrySet().stream()
@@ -113,31 +150,21 @@ public class SearchService {
             int numberOfPagesContainingFLemma = pagesAndLemmas.values().stream()
                     .map(lemmaList -> lemmaList.stream().map(Lemma::getLemma).toList())
                     .filter(lemmaList -> lemmaList.contains(fLemma)).toList().size();
-            return (double) numberOfPagesContainingFLemma / pagesAndLemmas.size() < 0.8;//fixme work on this number
+            return (double) numberOfPagesContainingFLemma / pagesAndLemmas.size() < percentOfPages;
         };
 
         List<Lemma> foundLemmas = lemmaService.getLemmasByListOfWords(foundLemmasFromDB.stream()
                 .filter(allPageLemmasForSearch::contains)
                 .filter(filterTooCommonLemmas)
                 .toList());
+        return foundLemmas;
+    }
 
-        List<String> contentWords = lemmaService.getFilteredWordAndLemma(page.getContent()).entrySet().stream()//fixme work on getFilteredWordAndLemmaS?
-                .filter(entry -> foundLemmas.stream().map(Lemma::getLemma)
-                .toList().contains(entry.getValue())).map(Map.Entry::getKey).toList();
+    public double getPercentOfPages() {
+        return percentOfPages;
+    }
 
-        String pageContent = page.getContent();
-
-        contentWords.forEach(contentWord -> {
-            int start = pageContent.toLowerCase().indexOf(contentWord);
-            int finish = start + contentWord.length();
-            int substringStart = Math.max(pageContent.toLowerCase().indexOf(contentWord) - 20, 0);
-            int substringFinish = Math.min(start + contentWord.length() + 200, pageContent.length() - 1);
-            String substring = pageContent.substring(substringStart, substringFinish)
-                    .replaceAll(pageContent.substring(start, finish),
-                            "<b>" + pageContent.substring(start, finish) + "</b>");
-            snippet.append("...").append(substring).append("...");
-        });
-
-        return snippet;
+    public void setPercentOfPages(double percentOfPages) {
+        this.percentOfPages = percentOfPages;
     }
 }

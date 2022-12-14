@@ -1,6 +1,8 @@
 package searchengine.dto.search;
 
-public class SearchPageData {//fixme may need to extend Comparable instead of Page
+import java.util.Comparator;
+
+public class SearchPageData implements Comparable<SearchPageData>  {
     private String site;
     private String siteName;
     private String uri;
@@ -63,5 +65,13 @@ public class SearchPageData {//fixme may need to extend Comparable instead of Pa
 
     public void setRelevance(float relevance) {
         this.relevance = relevance;
+    }
+    @Override
+    public int compareTo(SearchPageData s) {
+        return Comparator.comparing(SearchPageData::getRelevance).reversed()
+                .thenComparing(SearchPageData::getSiteName)
+                .thenComparing(SearchPageData::getTitle)
+                .thenComparing(SearchPageData::getUri)
+                .compare(this, s);
     }
 }

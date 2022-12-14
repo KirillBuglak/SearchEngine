@@ -36,14 +36,14 @@ public class IndexPageService {
                 .execute().statusCode();
         IndexPageResponse response = new IndexPageResponse();
         response.setResult(true);
-        boolean result = siteService.isThereTheSite(pagePath);//fixme may need to check it by status - just calling this page
-        if (result) {//fixme check if there's a page in db - not site
+        boolean result = siteService.isThereTheSite(pagePath);
+        if (result) {
             Page pageFormRep = pageService.getPageByPath(pagePath);
-            if (pageFormRep != null) {
+            if (pageFormRep != null) {//fixme && may need to check it by status - just calling this page
                 List<Index> indexesToDelete = indexService.getAllIndexesByPage(pageFormRep);
-                indexService.deleteIndexes(indexesToDelete);//
-                lemmaService.deleteLemmasByPagePath(pagePath);//
-                pageService.deleteThePageByPath(pagePath);//fixme works only in this order of three lines
+                indexService.deleteIndexes(indexesToDelete);
+                lemmaService.deleteLemmasByPagePath(pagePath);
+                pageService.deleteThePageByPath(pagePath);
             }
             pageService.savePage(siteService.getSiteByPagePath(pagePath), pagePath, statusCode, content);
             lemmaService.saveLemmas(pageService.getPageByPath(pagePath));
