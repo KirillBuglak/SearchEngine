@@ -105,7 +105,7 @@ public class StartIndexingService {
         siteService.saveSiteWithNewStatus(site, Status.INDEXED);
         System.out.println("Time Spent - " + (System.currentTimeMillis() - start));
         if (isaLastSite(site)) {
-            try {
+            try { //fixme may be put it in the final block with no check like isaLastSite
                 //fixme press stopIndexing here
                 Jsoup.connect("http://localhost:8080/api/stopIndexing").ignoreContentType(true)
                         .method(Connection.Method.GET).data("result", "true").execute();

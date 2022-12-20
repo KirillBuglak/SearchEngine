@@ -1,6 +1,5 @@
 package searchengine.services;
 
-import lombok.SneakyThrows;
 import org.springframework.stereotype.Service;
 import searchengine.model.Index;
 import searchengine.model.Lemma;
@@ -12,6 +11,7 @@ import java.util.List;
 @Service
 public class IndexService {
     private final IndexRepository indexRepository;
+
     public IndexService(IndexRepository indexRepository) {
         this.indexRepository = indexRepository;
     }
@@ -20,7 +20,6 @@ public class IndexService {
         return indexRepository.findAll();
     }
 
-    @SneakyThrows
     public void saveIndexes(Page page) {
         List<Lemma> lemmasPerPage = LemmaService.getPagesAndLemmas().get(page);
         lemmasPerPage.forEach(lemma -> {
@@ -50,11 +49,15 @@ public class IndexService {
                 .distinct().flatMap(List::stream).toList();
     }
 
+    public List<Index> getIndexesByLemma_lemma(String lemma) {
+        return indexRepository.findAllByLemma_Lemma(lemma);
+    }
+
     public List<Index> getAllIndexesByPage(Page page) {
         return indexRepository.findAllByPage(page);
     }
 
     public Index getIndexByPageAndLemma(Page page, Lemma lemma) {
-        return indexRepository.findByPageAndLemma(page,lemma);
+        return indexRepository.findByPageAndLemma(page, lemma);
     }
 }

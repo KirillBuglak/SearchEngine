@@ -1,6 +1,5 @@
 package searchengine.services;
 
-import lombok.SneakyThrows;
 import org.apache.lucene.morphology.LuceneMorphology;
 import org.apache.lucene.morphology.russian.RussianLuceneMorphology;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,9 +14,10 @@ import java.util.function.Predicate;
 
 @Service
 public class LemmaService {
-    private final PageService pageService;//fixme may need to delete it cause of style - use only lemmaRepository
+    private volatile int numberOfPagesForLemma;
+    private final IndexService indexService;
     private final LemmaRepository lemmaRepository;
-    private static final HashMap<Page, List<Lemma>> pagesAndLemmas;
+    private static final HashMap<Page, List<Lemma>> pagesAndLemmas; //fixme use it whenever possible to make the program work faster
     private final String regex = "[^Ё-ё\\d]";
     private static final LuceneMorphology morphology;
     private static final Predicate<String> neededWords;
@@ -49,43 +49,40 @@ public class LemmaService {
     }
 
     @Autowired
-    public LemmaService(PageService pageService, LemmaRepository lemmaRepository) {
-        this.pageService = pageService;
+    public LemmaService(IndexService indexService, LemmaRepository lemmaRepository) {
+        this.indexService = indexService;
         this.lemmaRepository = lemmaRepository;
     }
 
-    @SneakyThrows
-    public void saveLemmas(Page page) {
-        List<Lemma> lemmasPerPage = new ArrayList<>();
-        List<String> lemmas = getFilteredLemmas(page.getContent());
-        lemmas.forEach(lemma -> {
-            int numberOfPagesForLemma = pagesAndLemmas.entrySet().stream()
-                    .filter(entry -> entry.getValue().stream().map(Lemma::getLemma).toList().contains(lemma))
-                    .toList().size();
-            Lemma newLemma = new Lemma(page.getSite(), lemma, 1);
-            Lemma dbLemma = lemmaRepository.findByLemmaAndSite(lemma, page.getSite());
-            Optional<Lemma> perPageOptional = lemmasPerPage.stream().filter(Lemma -> Lemma.getLemma().equals(lemma))
-                    .findFirst();
-            if (dbLemma != null) {
-                dbLemma.setFrequency(numberOfPagesForLemma + 1);
-                lemmaRepository.save(dbLemma);
-                if (perPageOptional.isPresent()) {
-                    Lemma perPageLemma = perPageOptional.get();
-                    lemmasPerPage.remove(perPageLemma);
-                    perPageLemma.setFrequency(perPageLemma.getFrequency() + 1);
-                    lemmasPerPage.add(perPageLemma);
+    public void saveLemmas(Page page) {//fixme fucked up meth
+            List<Lemma> lemmasPerPage = new ArrayList<>();
+            List<String> lemmas = getFilteredLemmas(page.getContent());
+            lemmas.forEach(lemma -> {
+                numberOfPagesForLemma = indexService.getIndexesByLemma_lemma(lemma).size();
+                Lemma newLemma = new Lemma(page.getSite(), lemma, 1);
+                Lemma dbLemma = lemmaRepository.findByLemmaAndSite(lemma, page.getSite());
+                Optional<Lemma> perPageOptional = lemmasPerPage.stream().filter(Lemma -> Lemma.getLemma().equals(lemma))
+                        .findFirst();
+                if (dbLemma != null) {
+                    dbLemma.setFrequency(numberOfPagesForLemma + 1);
+                    lemmaRepository.save(dbLemma);
+                    if (perPageOptional.isPresent()) {//fixme here's problem
+                        Lemma perPageLemma = perPageOptional.get();
+                        lemmasPerPage.remove(perPageLemma);
+                        perPageLemma.setFrequency(perPageLemma.getFrequency() + 1);
+                        lemmasPerPage.add(perPageLemma);
+                    } else {
+                        newLemma.setId(lemmaRepository.findByLemmaAndSite(dbLemma.getLemma(), dbLemma.getSite()).getId());
+                        lemmasPerPage.add(newLemma);
+                    }
                 } else {
-                    lemmasPerPage.add(dbLemma);
+                    lemmaRepository.save(newLemma);
+                    lemmasPerPage.add(lemmaRepository.findByLemmaAndSite(newLemma.getLemma(), newLemma.getSite()));
                 }
-            } else {
-                lemmaRepository.save(newLemma);
-                lemmasPerPage.add(lemmaRepository.findByLemmaAndSite(lemma,page.getSite()));
-            }
-        });
-        pagesAndLemmas.put(page, lemmasPerPage);
+            });
+            pagesAndLemmas.put(page, lemmasPerPage);//fixme here's another page
     }
 
-    @SneakyThrows
     public List<String> getFilteredLemmas(String text) {
         ArrayList<String> words = new ArrayList<>(Arrays.stream(text.trim().toLowerCase().split(regex))
                 .filter(realWords).filter(neededWords).toList());
@@ -98,7 +95,7 @@ public class LemmaService {
         HashMap<String, String> wordAndLemma = new HashMap<>();
         ArrayList<String> words = new ArrayList<>(Arrays.stream(text.trim().toLowerCase().split(regex))
                 .filter(realWords).filter(neededWords).toList());
-        words.forEach(word -> wordAndLemma.put(word, morphology.getNormalForms(word).get(0)));
+        words.forEach(word -> wordAndLemma.put(word, morphology.getNormalForms(word).get(0)));//fixme may need only the first word
         return wordAndLemma;
     }
 
@@ -125,12 +122,14 @@ public class LemmaService {
         }
         return false;
     }
+
     public void deleteAllLemmas() {
         lemmaRepository.deleteAll();
     }
-    public void deleteLemmasByPagePath(String pagePath) {
-        Page page = pageService.getPageByPath(pagePath);
-        List<String> pageLemmas = getFilteredLemmas(pageService.getPageByPath(pagePath).getContent());
+
+    public void deleteLemmasByPage(Page page) {
+        pagesAndLemmas.remove(page);
+        List<String> pageLemmas = getFilteredLemmas(page.getContent()).stream().distinct().toList();
         pageLemmas.forEach(lemma -> {
             Lemma lemmaToChange = lemmaRepository.findByLemmaAndSite(lemma, page.getSite());
             lemmaToChange.setFrequency(lemmaToChange.getFrequency() - 1);
@@ -141,6 +140,7 @@ public class LemmaService {
             }
         });
     }
+
     public List<Lemma> getLemmasBySiteUrl(String siteUrl) {
         return lemmaRepository.findBySiteUrl(siteUrl);
     }

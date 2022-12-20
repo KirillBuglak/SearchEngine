@@ -28,7 +28,10 @@ public class PageLemmaIndexDBSave extends RecursiveAction {
     private final String pageRegEx = "https?://([-\\w.+=&?$%]+/?)+";
 
     @Autowired
-    public PageLemmaIndexDBSave(PageService pageService, LemmaService lemmaService, IndexService indexService, SiteService siteService) {
+    public PageLemmaIndexDBSave(PageService pageService,
+                                LemmaService lemmaService,
+                                IndexService indexService,
+                                SiteService siteService) {
         this.pageService = pageService;
         this.lemmaService = lemmaService;
         this.indexService = indexService;
@@ -76,7 +79,7 @@ public class PageLemmaIndexDBSave extends RecursiveAction {
     }
 
     @SneakyThrows
-    private Document requestDoc(String pageUrl) {
+    public Document requestDoc(String pageUrl) {
         //todo may need to sleep here for a while
         Connection connection = Jsoup.connect(pageUrl)
                 .userAgent(pageService.getUserAgent())
@@ -85,7 +88,7 @@ public class PageLemmaIndexDBSave extends RecursiveAction {
         Document document;
         try {
             statusCode = connection
-                    .ignoreContentType(true)
+//                    .ignoreContentType(true)
 //                    .ignoreHttpErrors(true)
                     .execute().statusCode();
             document = connection
@@ -107,5 +110,13 @@ public class PageLemmaIndexDBSave extends RecursiveAction {
 
     public void setPage(Page page) {
         this.page = page;
+    }
+
+    public int getStatusCode() {
+        return statusCode;
+    }
+
+    public StringBuilder getContent() {
+        return content;
     }
 }

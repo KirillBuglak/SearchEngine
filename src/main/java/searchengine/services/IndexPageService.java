@@ -1,13 +1,13 @@
 package searchengine.services;
 
 import lombok.SneakyThrows;
-import org.jsoup.Jsoup;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import searchengine.config.PageLemmaIndexDBSave;
 import searchengine.dto.IndexPageResponse;
-import searchengine.model.Index;
 import searchengine.model.Page;
-
-import java.util.List;
+import searchengine.model.Site;
+import searchengine.model.Status;
 
 @Service
 public class IndexPageService {
@@ -16,43 +16,48 @@ public class IndexPageService {
     private final SiteService siteService;
     private final LemmaService lemmaService;
     private final IndexService indexService;
+    private final PageLemmaIndexDBSave pageLemmaIndexDBSave;
 
     public IndexPageService(PageService pageService,
                             SiteService siteService,
                             LemmaService lemmaService,
-                            IndexService indexService) {
+                            IndexService indexService,
+                            PageLemmaIndexDBSave pageLemmaIndexDBSave) {
         this.pageService = pageService;
         this.siteService = siteService;
         this.lemmaService = lemmaService;
         this.indexService = indexService;
+        this.pageLemmaIndexDBSave = pageLemmaIndexDBSave;
     }
 
-    private static final String content = "бирюзы Бирюзы Круглой Двадцати двадцати мне " +
-            "побегу сверху раздетым работающим присев к или не пожалуй эй";
-
     @SneakyThrows
-    public IndexPageResponse getIndexPage(String pagePath) {
-        int statusCode = Jsoup.connect(pagePath).ignoreHttpErrors(true).followRedirects(false)
-                .execute().statusCode();
+    public IndexPageResponse getIndexPage(String url) {
         IndexPageResponse response = new IndexPageResponse();
-        response.setResult(true);
-        boolean result = siteService.isThereTheSite(pagePath);
-        if (result) {
-            Page pageFormRep = pageService.getPageByPath(pagePath);
-            if (pageFormRep != null) {//fixme && may need to check it by status - just calling this page
-                List<Index> indexesToDelete = indexService.getAllIndexesByPage(pageFormRep);
-                indexService.deleteIndexes(indexesToDelete);
-                lemmaService.deleteLemmasByPagePath(pagePath);
+        Site site = siteService.getSiteByPageUrl(url);
+        if (site != null) {
+            String pagePath = url.substring(url.indexOf(site.getUrl()) + site.getUrl().length() - 1);
+            Page pageFormDB = pageService
+                    .getPageByPath(pagePath);
+            if (pageFormDB != null) {//fixme && may need to check it by status - just calling this page
+                indexService.deleteIndexesByPage(pageFormDB);
+                lemmaService.deleteLemmasByPage(pageFormDB);
                 pageService.deleteThePageByPath(pagePath);
             }
-            pageService.savePage(siteService.getSiteByPagePath(pagePath), pagePath, statusCode, content);
-            lemmaService.saveLemmas(pageService.getPageByPath(pagePath));
+            pageLemmaIndexDBSave.requestDoc(url);//fixme may need to get rid of this
+            Page newPage = new Page(site, pagePath, pageLemmaIndexDBSave.getStatusCode(),
+                    pageLemmaIndexDBSave.getContent().toString());
+            pageService.save(newPage);
+                Thread thread = new Thread(() -> {
+            lemmaService.saveLemmas(pageService.getPageByPath(pagePath));//fixme work on it
             indexService.saveIndexes(pageService.getPageByPath(pagePath));
-        } else if (!pagePath.matches(pagePathRegex)) {
-            response.setResult(false);
+            response.setResult(true);
+            siteService.saveSiteWithNewStatus(site, Status.INDEXED);
+                });
+                thread.start();
+                thread.join();
+        } else if (!url.matches(pagePathRegex)) {
             response.setError("Проверьте правильность ввода адреса страницы");
         } else {//fixme may need to add if with a check for http status
-            response.setResult(false);
             response.setError("Данная страница находится за пределами сайтов, указанных в конфигурационном файле");
         }
         return response;

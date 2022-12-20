@@ -1,6 +1,7 @@
 package searchengine.services;
 
 import org.springframework.stereotype.Service;
+import searchengine.config.SitesList;
 import searchengine.model.Index;
 import searchengine.model.Site;
 import searchengine.model.Status;
@@ -15,13 +16,15 @@ public class SiteService {
     private final PageService pageService;
     private final IndexService indexService;
 
-    public SiteService(SiteRepository siteRepository, PageService pageService, IndexService indexService) {
+    public SiteService(SiteRepository siteRepository,
+                       PageService pageService,
+                       IndexService indexService) {
         this.siteRepository = siteRepository;
         this.pageService = pageService;
         this.indexService = indexService;
     }
 
-    public void updateTimeOfSite(Site site){
+    public void updateTimeOfSite(Site site) {
         site.setStatusTime(new Date());
         siteRepository.save(site);
     }
@@ -54,12 +57,9 @@ public class SiteService {
                 == pageService.getAllPagesBySite(site).size();
     }
 
-    public boolean isThereTheSite(String pagePath) {
-        if (pagePath.length() == 0) {
-            return false;
-        }
-        int end = pagePath.indexOf("/", pagePath.indexOf("//") + 2);
-        return siteRepository.findByUrl(pagePath.substring(0, end)) != null;
+    public Site getSiteByPageUrl(String url) {
+        return siteRepository.findAll().stream()
+                .filter(site -> url.contains(site.getUrl())).findFirst().orElse(null);
     }
 
     public Site getSiteByURL(String url) {
@@ -67,7 +67,7 @@ public class SiteService {
     }
 
     public Site getSiteByPagePath(String pagePath) {
-    int end = pagePath.indexOf("/", pagePath.indexOf("//") + 2);
+        int end = pagePath.indexOf("/", pagePath.indexOf("//") + 2);
         return siteRepository.findByUrl(pagePath.substring(0, end));
     }
 

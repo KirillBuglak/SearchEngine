@@ -19,13 +19,6 @@ public class PageService {
         this.pageRepository = pageRepository;
     }
 
-    public void savePage(Site site, String path, int code, String content) {
-        if (pageRepository.findByPath(path) == null) {
-            Page page = new Page(site, path, code, content);
-            pageRepository.save(page);
-        }
-    }
-
     public void save(Page page) {
         pageRepository.save(page);
     }
