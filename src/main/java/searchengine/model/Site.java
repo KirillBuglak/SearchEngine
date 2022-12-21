@@ -1,7 +1,6 @@
 package searchengine.model;
 
 import javax.persistence.*;
-import javax.validation.constraints.NotNull;
 import java.util.Date;
 
 @Entity
@@ -27,7 +26,7 @@ public class Site{
     public Site(String url, String name) {
         this.status = Status.INDEXING;
         this.statusTime = new Date();
-        this.lastError = "";
+//        this.lastError = "";
         this.url = url;
         this.name = name;
     }

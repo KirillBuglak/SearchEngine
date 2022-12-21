@@ -4,7 +4,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class StopIndexingResponse extends CommonResponse {
-    private volatile boolean result;
+    private static volatile boolean result;
     public StopIndexingResponse() {
         result = true;
     }
@@ -12,8 +12,11 @@ public class StopIndexingResponse extends CommonResponse {
     public boolean isResult() {
         return result;
     }
+    public static boolean getResult() {
+        return result;
+    }
     @Override
     public void setResult(boolean result) {
-        this.result = result;
+        StopIndexingResponse.result = result;
     }
 }

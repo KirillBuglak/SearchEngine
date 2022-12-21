@@ -17,20 +17,14 @@ import javax.validation.Valid;
 public class ApiController {
     private final StatisticsService statisticsService;
     private final SearchService searchService;
-    private final IndexPageService indexPageService;
-    private final StopIndexingService stopIndexingService;
-    private final StartIndexingService startIndexingService;
+    private final IndexingService indexingService;
 
     public ApiController(StatisticsService statisticsService,
                          SearchService searchService,
-                         IndexPageService indexPageService,
-                         StopIndexingService stopIndexingService,
-                         StartIndexingService startIndexingService) {
+                         IndexingService indexingService) {
         this.statisticsService = statisticsService;
         this.searchService = searchService;
-        this.indexPageService = indexPageService;
-        this.stopIndexingService = stopIndexingService;
-        this.startIndexingService = startIndexingService;
+        this.indexingService = indexingService;
     }
 
     @GetMapping("/statistics")
@@ -45,17 +39,17 @@ public class ApiController {
 
     @PostMapping("/indexPage")
     public ResponseEntity<IndexPageResponse> indexPage(@Valid @RequestParam String url) {
-        return ResponseEntity.ok(indexPageService.getIndexPage(url));
+        return ResponseEntity.ok(indexingService.getIndexPage(url));
     }
 
     @SneakyThrows
     @GetMapping("/startIndexing")
     public ResponseEntity<StartIndexingResponse> startIndexing() {
-        return ResponseEntity.ok(startIndexingService.getStartIndexing());
+        return ResponseEntity.ok(indexingService.getStartIndexing());
     }
 
     @GetMapping("/stopIndexing")
     public ResponseEntity<StopIndexingResponse> stopIndexing() {
-        return ResponseEntity.ok(stopIndexingService.getStopIndexing());
+        return ResponseEntity.ok(indexingService.getStopIndexing());
     }
 }

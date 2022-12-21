@@ -9,6 +9,10 @@ import searchengine.model.Index;
 import searchengine.model.Lemma;
 import searchengine.model.Page;
 import searchengine.model.Site;
+import searchengine.services.modelServices.IndexService;
+import searchengine.services.modelServices.LemmaService;
+import searchengine.services.modelServices.PageService;
+import searchengine.services.modelServices.SiteService;
 
 import java.io.IOException;
 import java.util.*;

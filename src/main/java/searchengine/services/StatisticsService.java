@@ -6,6 +6,9 @@ import searchengine.dto.statistics.DetailedStatisticsItem;
 import searchengine.dto.statistics.StatisticsData;
 import searchengine.dto.statistics.StatisticsResponse;
 import searchengine.dto.statistics.TotalStatistics;
+import searchengine.services.modelServices.LemmaService;
+import searchengine.services.modelServices.PageService;
+import searchengine.services.modelServices.SiteService;
 
 import java.util.ArrayList;
 import java.util.Date;

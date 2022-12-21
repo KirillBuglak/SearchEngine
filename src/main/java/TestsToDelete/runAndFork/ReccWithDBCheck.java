@@ -7,9 +7,9 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import searchengine.model.Page;
-import searchengine.services.IndexService;
-import searchengine.services.LemmaService;
-import searchengine.services.PageService;
+import searchengine.services.modelServices.IndexService;
+import searchengine.services.modelServices.LemmaService;
+import searchengine.services.modelServices.PageService;
 
 import java.util.ArrayList;
 import java.util.List;

@@ -6,8 +6,8 @@ import org.jsoup.Jsoup;
 import org.springframework.beans.factory.annotation.Autowired;
 import searchengine.model.Page;
 import searchengine.model.Site;
-import searchengine.services.PageService;
-import searchengine.services.SiteService;
+import searchengine.services.modelServices.PageService;
+import searchengine.services.modelServices.SiteService;
 
 import java.io.IOException;
 import java.util.Set;
@@ -60,10 +60,10 @@ public class Runn extends Thread {//fixme may be RunnableFuture<T>
 //                    throw new RuntimeException(e);
 //                }
         });
-        System.err.println(site.getUrl() + " - " + thisSitePages.size() + " - SIZE");//fixme not the right SIZE
+        System.err.println(site.getUrl() + " - " + thisSitePages.size() + " - SIZE");
         System.out.println("FINE");
         //save indexed or failed site
-        siteService.saveSiteIndexedOrFailed(site.getUrl());
+        siteService.saveSiteIndexedOrFailed(site);
         System.out.println("Time Spent - " + (System.currentTimeMillis() - start));
         //save indexed or failed site
 //add sites to database

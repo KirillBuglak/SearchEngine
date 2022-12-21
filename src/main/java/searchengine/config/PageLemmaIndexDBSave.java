@@ -9,10 +9,10 @@ import org.jsoup.select.Elements;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import searchengine.model.Page;
-import searchengine.services.IndexService;
-import searchengine.services.LemmaService;
-import searchengine.services.PageService;
-import searchengine.services.SiteService;
+import searchengine.services.modelServices.IndexService;
+import searchengine.services.modelServices.LemmaService;
+import searchengine.services.modelServices.PageService;
+import searchengine.services.modelServices.SiteService;
 
 import java.util.concurrent.RecursiveAction;
 
@@ -80,7 +80,7 @@ public class PageLemmaIndexDBSave extends RecursiveAction {
 
     @SneakyThrows
     public Document requestDoc(String pageUrl) {
-        //todo may need to sleep here for a while
+        //fixme may need to sleep here for a while
         Connection connection = Jsoup.connect(pageUrl)
                 .userAgent(pageService.getUserAgent())
                 .referrer(pageService.getReferrer())
@@ -89,7 +89,7 @@ public class PageLemmaIndexDBSave extends RecursiveAction {
         try {
             statusCode = connection
 //                    .ignoreContentType(true)
-//                    .ignoreHttpErrors(true)
+                    .ignoreHttpErrors(true)
                     .execute().statusCode();
             document = connection
                     .get();
@@ -118,5 +118,9 @@ public class PageLemmaIndexDBSave extends RecursiveAction {
 
     public StringBuilder getContent() {
         return content;
+    }
+
+    public String getPageRegEx() {
+        return pageRegEx;
     }
 }
