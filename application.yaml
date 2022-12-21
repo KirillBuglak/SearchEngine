@@ -28,6 +28,9 @@ indexing-settings:
 #    - url: https://volochek.life/
 #      name: VolochekLife
 
-jsoup:
-  userAgent: "Kirill's Search Engine"
-  referrer: "https://www.google.com"
+jsoup-settings:
+  userAgent: KirillSearchEngine
+  referrer: https://www.google.com/
+
+search-service:
+  percentOfPages: 0.7
