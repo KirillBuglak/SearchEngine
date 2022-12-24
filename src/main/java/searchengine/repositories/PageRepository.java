@@ -5,10 +5,10 @@ import org.springframework.stereotype.Repository;
 import searchengine.model.Page;
 import searchengine.model.Site;
 
-import java.util.List;
+import java.util.Set;
 
 @Repository
 public interface PageRepository extends JpaRepository<Page, Integer> {
     Page findByPath(String path);
-    List<Page> findAllBySite(Site site);
+    Set<Page> findAllBySite(Site site);
 }

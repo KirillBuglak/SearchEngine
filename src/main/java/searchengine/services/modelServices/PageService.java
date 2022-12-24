@@ -43,7 +43,7 @@ public class PageService {
         return pageRepository.findAll();
     }
 
-    public List<Page> getAllPagesBySite(Site site) {
+    public Set<Page> getAllPagesBySite(Site site) {
         return pageRepository.findAllBySite(site);
     }
 

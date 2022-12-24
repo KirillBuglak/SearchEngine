@@ -11,17 +11,18 @@ import searchengine.repositories.LemmaRepository;
 import java.io.IOException;
 import java.util.*;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 @Service
 public class LemmaService {
     private volatile int numberOfPagesForLemma;
     private final IndexService indexService;
     private final LemmaRepository lemmaRepository;
-    private static final HashMap<Page, List<Lemma>> pagesAndLemmas; //fixme use it whenever possible to make the program work faster
+    private static final HashMap<Page, Set<Lemma>> pagesAndLemmas; //fixme is there a delete here when there's delete from bd, use it whenever possible to make the program work faster
     private final String regex = "[^Ё-ё\\d]";
     private static final LuceneMorphology morphology;
-    private static final Predicate<String> neededWords;
-    private static final Predicate<String> realWords;//fixme work on it ть
+    private static final Predicate<String> neededWords;//fixme work on it ть
+    private static final Predicate<String> realWords;
 
     static {
         pagesAndLemmas = new HashMap<>();
@@ -32,11 +33,18 @@ public class LemmaService {
         }
         neededWords = word -> (morphology.getMorphInfo(word).stream()
                 .anyMatch(mInfo ->
-                        (mInfo.contains("|A") && mInfo.length() > 2) //fixme length is variable here
-                                || mInfo.contains("|Y")
-                                || mInfo.contains("|i")
-                                || (mInfo.contains("|a") && mInfo.length() > 3)
-                                || mInfo.contains("|j")));
+                {
+                    String nForm = mInfo.substring(0, mInfo.indexOf("|"));
+                    return (mInfo.contains("|A")
+//                            && nForm.length() > 2
+                    ) //fixme length is variable here
+                            || mInfo.contains("|Y")
+                            || mInfo.contains("|i")
+                            || (mInfo.contains("|a")
+//                            && nForm.length() > 2
+                    ) //fixme length is variable here
+                            || mInfo.contains("|j");
+                }));
         realWords = word -> {
             List<String> normalForms;
             try {
@@ -54,8 +62,8 @@ public class LemmaService {
         this.lemmaRepository = lemmaRepository;
     }
 
-    public void saveLemmas(Page page) {
-        List<Lemma> lemmasPerPage = new ArrayList<>();
+    public void saveLemmas(Page page) {//fixme - may not need to even save too common lemmas
+        Set<Lemma> lemmasPerPage = new HashSet<>();
         List<String> lemmas = getFilteredLemmas(page.getContent());
         lemmas.forEach(lemma -> {
             if (SiteService.stoppedByUser(page.getSite())) {
@@ -80,7 +88,7 @@ public class LemmaService {
                 }
             } else {
                 lemmaRepository.save(newLemma);
-                lemmasPerPage.add(lemmaRepository.findByLemmaAndSite(newLemma.getLemma(), newLemma.getSite()));
+                lemmasPerPage.add(newLemma);
             }
         });
         if (pagesAndLemmas.keySet().stream().map(Page::getPath).anyMatch(path -> path.equals(page.getPath()))) {
@@ -91,7 +99,7 @@ public class LemmaService {
     }
 
 
-    public List<String> getFilteredLemmas(String text) {
+    public List<String> getFilteredLemmas(String text) {//fixme DONT MAKE IT RETURN SET
         ArrayList<String> words = new ArrayList<>(Arrays.stream(text.trim().toLowerCase().split(regex))
                 .filter(realWords).filter(neededWords).toList());
 
@@ -101,18 +109,18 @@ public class LemmaService {
 
     public HashMap<String, String> getFilteredWordAndLemma(String text) {
         HashMap<String, String> wordAndLemma = new HashMap<>();
-        ArrayList<String> words = new ArrayList<>(Arrays.stream(text.trim().toLowerCase().split(regex))
-                .filter(realWords).filter(neededWords).toList());
+        ArrayList<String> words = Arrays.stream(text.trim().toLowerCase().split(regex))
+                .filter(realWords).filter(neededWords).distinct().collect(Collectors.toCollection(ArrayList::new));
         words.forEach(word -> wordAndLemma.put(word, morphology.getNormalForms(word).get(0)));//fixme may need only the first word
         return wordAndLemma;
     }
 
-    public List<Lemma> getLemmasByListOfWords(List<String> words) {
-        return words.stream().map(lemmaRepository::findByLemma).distinct().flatMap(List::stream)
-                .sorted().toList();
+    public SortedSet<Lemma> getSortedLemmasByListOfWords(List<String> words) {
+        return words.stream().map(lemmaRepository::findByLemma).flatMap(Set::stream)
+                .collect(Collectors.toCollection(TreeSet::new));
     }
 
-    public static HashMap<Page, List<Lemma>> getPagesAndLemmas() {
+    public static HashMap<Page, Set<Lemma>> getPagesAndLemmas() {
         return pagesAndLemmas;
     }
 
@@ -136,7 +144,7 @@ public class LemmaService {
     }
 
     public void deleteLemmasByPage(Page page) {
-        List<String> pageLemmas = getFilteredLemmas(page.getContent()).stream().distinct().toList();
+        Set<String> pageLemmas = new HashSet<>(getFilteredLemmas(page.getContent()));
         pageLemmas.forEach(lemma -> {
             Lemma lemmaToChange = lemmaRepository.findByLemmaAndSite(lemma, page.getSite());
             lemmaToChange.setFrequency(lemmaToChange.getFrequency() - 1);
@@ -148,7 +156,7 @@ public class LemmaService {
         });
     }
 
-    public List<Lemma> getLemmasBySiteUrl(String siteUrl) {
+    public Set<Lemma> getLemmasBySiteUrl(String siteUrl) {
         return lemmaRepository.findBySiteUrl(siteUrl);
     }
 }

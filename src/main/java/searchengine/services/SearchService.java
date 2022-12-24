@@ -28,7 +28,8 @@ public class SearchService {
     private final SiteService siteService;
     private final IndexService indexService;
     private final PageService pageService;
-    private List<Lemma> foundFilteredLemmasFromDB;
+    private SortedSet<Lemma> foundFilteredLemmasFromDB;
+    private Iterator<Lemma> foundFilteredLemmasFromDBIterator;
 
     public SearchService(LemmaService lemmaService,
                          SiteService siteService,
@@ -49,22 +50,20 @@ public class SearchService {
         };
 
         Site searchSite = siteService.getSiteByURL(searchSiteUrl);
-        foundFilteredLemmasFromDB = lemmaService.getLemmasByListOfWords(lemmaService.getFilteredLemmas(query).stream()
-                .filter(lemmaService::isLemmaPresent)
-                .filter(filterTooCommonLemmas).toList());//fixme filter lemmas here
+        foundFilteredLemmasFromDB = lemmaService.getSortedLemmasByListOfWords(lemmaService.getFilteredLemmas(query)
+                .stream().filter(filterTooCommonLemmas).toList());
+        foundFilteredLemmasFromDBIterator = foundFilteredLemmasFromDB.iterator();
 
-        List<Integer> lemmasIds = foundFilteredLemmasFromDB.stream().map(Lemma::getId)
-                .distinct().toList();
-        List<Index> allIndexesByLemmaIds = indexService.getAllIndexesByLemmaIds(lemmasIds);
-        List<Index> searchSiteIndexes = allIndexesByLemmaIds.stream().filter(index -> index.getPage().getSite()
-                .getUrl().equals(searchSiteUrl)).toList();
+        Set<Index> allIndexesByFirstLemma = indexService.getAllIndexesByLemma(foundFilteredLemmasFromDBIterator.next());
+        Set<Index> searchSiteIndexesByFirstLemma = allIndexesByFirstLemma.stream().filter(index -> index.getPage().getSite()
+                .getUrl().equals(searchSiteUrl)).collect(Collectors.toSet());
 
-        if (searchSite == null && getPageRelInfo(allIndexesByLemmaIds) != null) { //fixme make it easier
-            response.setData(addSearchPageDataInfo(Objects.requireNonNull(getPageRelInfo(allIndexesByLemmaIds))));
+        if (searchSite == null && getPageRelInfo(allIndexesByFirstLemma) != null) { //fixme make it easier
+            response.setData(addSearchPageDataInfo(Objects.requireNonNull(getPageRelInfo(allIndexesByFirstLemma))));
             response.setCount(response.getData().size());
             response.setResult(response.getCount() != 0);
-        } else if (searchSite != null && getPageRelInfo(searchSiteIndexes) != null) { //fixme make it easier
-            response.setData(addSearchPageDataInfo(Objects.requireNonNull(getPageRelInfo(searchSiteIndexes))));
+        } else if (searchSite != null && getPageRelInfo(searchSiteIndexesByFirstLemma) != null) { //fixme make it easier
+            response.setData(addSearchPageDataInfo(Objects.requireNonNull(getPageRelInfo(searchSiteIndexesByFirstLemma))));
             response.setCount(response.getData().size());
             response.setResult(response.getCount() != 0);
         } else if (query.isBlank()) {
@@ -73,25 +72,6 @@ public class SearchService {
             response.setError("По вашему запросу ничего не нашлось");
         }
         return response;
-    }
-
-    private Map<Page, Float> getPageRelInfo(List<Index> indexesList) {
-        if (indexesList.size() == 0){
-            return null;
-        }
-        //fixme may need to return null
-        HashMap<Page, Float> pageAndAbsRel = new HashMap<>();
-        indexesList.forEach(index -> {
-            Page pageFromIndex = index.getPage();
-            if (pageAndAbsRel.containsKey(pageFromIndex)) {
-                pageAndAbsRel.put(pageFromIndex, pageAndAbsRel.get(pageFromIndex) + index.getRank());
-            } else {
-                pageAndAbsRel.put(pageFromIndex, index.getRank());
-            }
-        });
-        Float divisor = pageAndAbsRel.values().stream().reduce(Math::max).orElse(0f);
-        return pageAndAbsRel.entrySet().stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue() / divisor));
     }
 
     private List<SearchPageData> addSearchPageDataInfo(Map<Page, Float> pageRelInfo) {
@@ -115,14 +95,57 @@ public class SearchService {
         return dataList.size() == 0 ? null : dataList;
     }
 
+    private Map<Page, Float> getPageRelInfo(Set<Index> indexSet) {
+        if (indexSet.size() == 0) {
+            return null;
+        }
+        Map<Integer, Set<Page>> indexOfLemmaAndPages = getIndexOfLemmaAndPages(indexSet);
+        Map<Page, Float> pageAndAbsRel = new HashMap<>();
+        indexOfLemmaAndPages.forEach((indexOfLemma, pages) -> pages.forEach(page -> {
+            float relevance = 0;
+            Iterator<Lemma> iterator = foundFilteredLemmasFromDB.iterator();
+            for (int i = 0; i <= indexOfLemma; i++) {
+                relevance += indexService.getIndexByPageAndLemma(page, iterator.next()).getRank();
+            }
+            pageAndAbsRel.put(page, relevance);
+        }));
+        Float divisor = pageAndAbsRel.values().stream().reduce(Math::max).orElse((float) 0);
+        return pageAndAbsRel.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue() / divisor));
+    }
+
+    private Map<Integer, Set<Page>> getIndexOfLemmaAndPages(Set<Index> indexSet) {
+        Map<Integer, Set<Page>> indexOfLemmaAndPages = new HashMap<>();
+        indexOfLemmaAndPages.put(0, indexSet.stream().map(Index::getPage).collect(Collectors.toSet()));
+        for (int i = 1; i < foundFilteredLemmasFromDB.size() - 1; i++) {
+            Set<Page> pagesOfPreviousLemma = indexOfLemmaAndPages.get(i - 1);
+            Set<Page> pagesOfThisLemma = indexService.getAllIndexesByLemma(foundFilteredLemmasFromDBIterator.next())
+                    .stream().map(Index::getPage).collect(Collectors.toSet());
+            Set<Page> result = pagesOfThisLemma.stream().filter(pagesOfPreviousLemma::contains)
+                    .peek(pagesOfPreviousLemma::remove).collect(Collectors.toSet());
+            if (result.size() == 0) {
+                break;
+            } else {
+                indexOfLemmaAndPages.put(i, result);
+            }
+            if (pagesOfPreviousLemma.size() == 0) {
+                indexOfLemmaAndPages.remove(i - 1);
+            } else {
+                indexOfLemmaAndPages.put(i - 1, pagesOfPreviousLemma);
+            }
+        }
+
+        return indexOfLemmaAndPages;
+    }
+
     private StringBuilder buildSnippet(Page page) {
         StringBuilder snippet = new StringBuilder();
 
         String pageContent = page.getContent();
 
-        List<Lemma> foundFilteredLemmasByPage = getFoundFilteredLemmasByPage(page);
+        Set<Lemma> foundFilteredLemmasByPage = getFoundFilteredLemmasByPage(page);
 
-        List<String> contentWordsSorted = getContentWordsSorted(foundFilteredLemmasByPage, pageContent);
+        Set<String> contentWordsSorted = getContentWordsSorted(foundFilteredLemmasByPage, pageContent);
 
         contentWordsSorted.forEach(contentWord -> {
             int pageStart = pageContent.toLowerCase().indexOf(contentWord);
@@ -149,17 +172,19 @@ public class SearchService {
         return snippet;
     }
 
-    private List<Lemma> getFoundFilteredLemmasByPage(Page page) {
+    private Set<Lemma> getFoundFilteredLemmasByPage(Page page) {
         return foundFilteredLemmasFromDB.stream()
                 .filter(lemma -> indexService.getAllIndexesByPage(page).stream()
-                        .map(index -> index.getLemma().getLemma()).toList().contains(lemma.getLemma())).toList();
+                        .map(index -> index.getLemma().getLemma()).toList().contains(lemma.getLemma()))
+                .collect(Collectors.toSet());
     }
 
-    private List<String> getContentWordsSorted(List<Lemma> foundFilteredLemmasByPage, String pageContent) {
+    private SortedSet<String> getContentWordsSorted(Set<Lemma> foundFilteredLemmasByPage, String pageContent) {
         return lemmaService.getFilteredWordAndLemma(pageContent).entrySet().stream()
                 .filter(entry -> foundFilteredLemmasByPage.stream().map(Lemma::getLemma)
                         .toList().contains(entry.getValue())).map(Map.Entry::getKey)
-                .sorted(Comparator.comparingInt(w -> pageContent.toLowerCase().indexOf(w))).toList();
+                .sorted(Comparator.comparingInt(word -> pageContent.toLowerCase().indexOf(word)))//fixme does it work?
+                .collect(Collectors.toCollection(TreeSet::new));
     }
 
     public double getPercentOfPages() {

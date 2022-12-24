@@ -19,8 +19,7 @@ import searchengine.services.modelServices.SiteService;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinTask;
+import java.util.concurrent.*;
 
 @Service
 public class IndexingService {
@@ -49,37 +48,39 @@ public class IndexingService {
         this.startResponse = startResponse;
     }
 
-    @SneakyThrows
     public IndexPageResponse getIndexPage(String url) {
+        IndexPageResponse response = new IndexPageResponse();
         PageLemmaIndexDBSave justGetFields = new PageLemmaIndexDBSave(this.pageService, this.lemmaService,
                 this.indexService, this.siteService);
-        IndexPageResponse response = new IndexPageResponse();
-        Site site = siteService.getSiteByPageUrl(url);
-        if (site != null) {
-            String pagePath = url.substring(url.indexOf(site.getUrl()) + site.getUrl().length() - 1);
-            Page pageFormDB = pageService
-                    .getPageByPath(pagePath);
-            if (pageFormDB != null) {//fixme && may need to check it by status - just calling this page
-                indexService.deleteIndexesByPage(pageFormDB);
-                lemmaService.deleteLemmasByPage(pageFormDB);
-                pageService.deleteThePageByPath(pagePath);
-            }
-            justGetFields.requestDoc(url);
-            Page newPage = new Page(site, pagePath, justGetFields.getStatusCode(),
-                    justGetFields.getContent().toString());
-            pageService.save(newPage);
-            Thread thread = new Thread(() -> {//fixme maybe use while with sync
-                lemmaService.saveLemmas(newPage);
-                indexService.saveIndexes(newPage);
-            });
-            thread.start();
-            thread.join();
-            response.setResult(true);
-            siteService.saveSiteIndexedOrFailed(site);
-        } else if (!url.matches(justGetFields.getPageRegEx())) {
+        if (getPageStatusCode(url) != 200 || !url.matches(justGetFields.getPageRegEx())) {
             response.setError("Проверьте правильность ввода адреса страницы");
-        } else {//fixme may need to add if with a check for http status
+        } else if (siteService.getAllSites().stream().map(Site::getUrl).filter(url::contains).toList().size() == 0) {
             response.setError("Данная страница находится за пределами сайтов, указанных в конфигурационном файле");
+        } else {
+            response.setResult(true);
+            ExecutorService executorService = Executors.newSingleThreadExecutor();
+            executorService.execute(() -> {
+                Site site = siteService.getSiteByPageUrl(url);
+                if (site != null) {
+                    String pagePath = url.substring(url.indexOf(site.getUrl()) + site.getUrl().length() - 1);
+                    Page pageFormDB = pageService
+                            .getPageByPath(pagePath);
+                    if (pageFormDB != null) {
+                        indexService.deleteIndexesByPage(pageFormDB);
+                        lemmaService.deleteLemmasByPage(pageFormDB);
+                        pageService.deleteThePageByPath(pagePath);
+                    }
+                    justGetFields.requestDoc(url);
+                    Page newPage = new Page(site, pagePath, justGetFields.getStatusCode(),
+                            justGetFields.getContent().toString());
+                    pageService.save(newPage);
+//fixme maybe synchronise
+                    lemmaService.saveLemmas(newPage);
+                    indexService.saveIndexes(newPage);
+//fixme maybe synchronise
+                    siteService.saveSiteIndexedOrFailed(site);
+                }
+            });
         }
         return response;
     }
@@ -175,5 +176,13 @@ public class IndexingService {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @SneakyThrows
+    private int getPageStatusCode(String url) {
+        return Jsoup.connect(url)
+                .userAgent(pageService.getUserAgent())
+                .referrer(pageService.getReferrer())
+                .timeout(20000).execute().statusCode();
     }
 }
