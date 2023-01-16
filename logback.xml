@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+            <charset>utf8</charset>
+        </encoder>
+    </appender>
+    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+        <file>logs/analytics.log</file>
+        <append>true</append>
+        <encoder>
+            <pattern>${FILE_LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+    <logger name="searchengine.config.PageLemmaIndexDBSave" level="INFO" additivity="true">
+        <appender-ref ref="FILE"/>
+    </logger>
+    <logger name="searchengine.services.IndexingService" level="INFO" additivity="true">
+        <appender-ref ref="FILE"/>
+    </logger>
+    <logger name="searchengine.services.SearchService" level="INFO" additivity="true">
+        <appender-ref ref="FILE"/>
+    </logger>
+    <root level="INFO">
+        <appender-ref ref="CONSOLE" />
+    </root>
+</configuration>
