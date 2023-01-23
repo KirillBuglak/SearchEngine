@@ -10,22 +10,27 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL8Dialect
+        order_inserts: true
+        order_updates: true
+        batch_versioned_data: true
+        jdbc:
+          batch_size: 25
     hibernate:
-      ddl-auto: create
+      ddl-auto: update
       format_sql: true
     show-sql: true
 
 indexing-settings:
   sites:
-#    - url: https://lenta.ru/rubrics/life/
+    - url: https://dombulgakova.ru
+      name: DomBulgakova/
+    - url: https://nikoartgallery.com
+      name: NikoArtGallery
+#    - url: https://lenta.ru
 #      name: Лента.ру
-#    - url: https://skillbox.ru/
-#      name: Skillbox
-#    - url: https://playback.ru/
-#      name: PlayBack.Ru
-    - url: https://dombulgakova.ru/magazin/
-      name: DomBulgakova
-#    - url: https://volochek.life/
+#    - url: https://www.svetlovka.ru/
+#      name: RadioMV
+#    - url: https://volochek.life
 #      name: VolochekLife
 
 jsoup-settings:
@@ -34,3 +39,7 @@ jsoup-settings:
 
 search-service:
   percentOfPages: 0.7
+  numberOfSymbols: 300
+
+logging:
+  config: logback.xml
