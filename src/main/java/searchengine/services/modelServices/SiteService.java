@@ -2,14 +2,12 @@ package searchengine.services.modelServices;
 
 import org.springframework.stereotype.Service;
 import searchengine.config.SitesList;
-import searchengine.dto.StopIndexingResponse;
 import searchengine.model.Site;
 import searchengine.model.Status;
 import searchengine.repositories.SiteRepository;
 
 import java.util.Date;
 import java.util.List;
-import java.util.Objects;
 
 @Service
 public class SiteService {
@@ -26,7 +24,7 @@ public class SiteService {
         siteRepository.save(site);
     }
 
-    public void saveSitesIndexing() {
+    public void saveAllSitesIndexing() {
         sites.getSites().forEach(site -> {
             if (siteRepository.findByUrl(site.getUrl()) != null) {
                 return;
@@ -43,7 +41,7 @@ public class SiteService {
         }
     }
 
-    private void saveSiteWithNewStatus(Site site, Status status) {
+    public void saveSiteWithNewStatus(Site site, Status status) {
         site.setStatus(status);
         site.setStatusTime(new Date());
         siteRepository.save(site);

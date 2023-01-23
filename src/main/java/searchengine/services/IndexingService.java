@@ -15,7 +15,6 @@ import searchengine.services.modelServices.PageService;
 import searchengine.services.modelServices.SiteService;
 
 import java.io.IOException;
-import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
@@ -48,7 +47,7 @@ public class IndexingService {
         startResponse = new StartIndexingResponse();
     }
 
-    public IndexPageResponse getIndexPage(String url) {
+    public IndexPageResponse getIndexPage(String url) {//fixme work on get doc
         IndexPageResponse pageResponse = new IndexPageResponse();
         if (url.isBlank() || getPageStatusCode(url) != 200 || !url.matches(justGetFields.getPageRegEx())) {
             pageResponse.setError("Проверьте правильность ввода адреса страницы");
@@ -59,6 +58,7 @@ public class IndexingService {
             executorService.execute(() -> {
                 Site site = siteService.getSiteByPageUrl(url);
                 if (site != null) {
+                    siteService.saveSiteWithNewStatus(site, Status.INDEXING);
                     String pagePath = url.substring(url.indexOf(site.getUrl()) + site.getUrl().length());
                     Page pageFormDB = pageService
                             .getPageByPathAndSite(pagePath, site);
@@ -88,13 +88,13 @@ public class IndexingService {
         if ((stopResponse.isResult() || stopResponse.getError() != null) && !startResponse.isResult()) {
             startResponsePositive();
             deleteEverything();
-            siteService.saveSitesIndexing();
+            siteService.saveAllSitesIndexing();
             siteService.getAllSites().forEach(site -> {
                 Thread thread = new Thread(() -> saveToDB(site), site.getName());
                 thread.start();
             });
         } else {
-            startResponseNegative("Индексация уже запущена");
+            startResponseNegative();
         }
         return startResponse;
     }
@@ -105,9 +105,9 @@ public class IndexingService {
         startResponse.setError(null);
     }
 
-    private void startResponseNegative(String errorMessage) {
+    private void startResponseNegative() {
         startResponse.setResult(false);
-        startResponse.setError(errorMessage);
+        startResponse.setError("Индексация уже запущена");
         stopResponse.setError(null);
     }
 

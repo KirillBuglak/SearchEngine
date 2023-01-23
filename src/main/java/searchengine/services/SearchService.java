@@ -27,12 +27,12 @@ import java.util.stream.Collectors;
 public class SearchService {
 
     private double percentOfPages;
+    private int numberOfSymbols;
     private final LemmaService lemmaService;
     private final SiteService siteService;
     private final IndexService indexService;
     private final PageService pageService;
     private SortedSet<Lemma> foundFilteredLemmasFromDB;
-    private Iterator<Lemma> foundFilteredLemmasFromDBIterator;
 
     public SearchService(LemmaService lemmaService,
                          SiteService siteService,
@@ -57,29 +57,28 @@ public class SearchService {
         Site searchSite = siteService.getSiteByURL(searchSiteUrl);
         foundFilteredLemmasFromDB = lemmaService.getSortedLemmasByListOfWords(lemmaService.getFilteredLemmas(query)
                 .stream().filter(filterTooCommonLemmas).toList());
-        Set<Index> allIndexesByFirstLemma = new HashSet<>();
-        Set<Index> searchSiteIndexesByFirstLemma = new HashSet<>();
 
-        if (foundFilteredLemmasFromDB.size() != 0) {
-            foundFilteredLemmasFromDBIterator = foundFilteredLemmasFromDB.iterator();
-            allIndexesByFirstLemma = indexService.getAllIndexesByLemma(foundFilteredLemmasFromDBIterator.next());
-            searchSiteIndexesByFirstLemma = allIndexesByFirstLemma.stream().filter(index -> index.getPage()
-                    .getSite().getUrl().equals(searchSiteUrl)).collect(Collectors.toSet());
-        }
+        Set<Lemma> firstLemmasForAllSites = new HashSet<>();
+        siteService.getAllSites().forEach(site -> foundFilteredLemmasFromDB.stream()
+                .filter(lemma -> lemma.getSite().equals(site)).findFirst().ifPresent(firstLemmasForAllSites::add));
 
-        if (searchSite == null && getPageRelInfo(allIndexesByFirstLemma) != null) {
-            response.setData(addSearchPageDataInfo(Objects.requireNonNull(getPageRelInfo(allIndexesByFirstLemma))));
-            response.setCount(response.getData().size());
-            response.setResult(response.getCount() != 0);
-        } else if (searchSite != null && getPageRelInfo(searchSiteIndexesByFirstLemma) != null) {
-            response.setData(addSearchPageDataInfo(Objects.requireNonNull(getPageRelInfo(
-                    searchSiteIndexesByFirstLemma))));
-            response.setCount(response.getData().size());
-            response.setResult(response.getCount() != 0);
-        } else if (query.isBlank()) {
+        Set<Page> allPagesByFirstLemma = firstLemmasForAllSites.stream().map(indexService::getAllIndexesByLemma)
+                .flatMap(Collection::stream).map(Index::getPage).collect(Collectors.toSet());
+
+        if (query.isBlank()) {
             response.setError("Задан пустой поисковый запрос");
-        } else {
+        } else if (foundFilteredLemmasFromDB.size() == 0) {
             response.setError("По вашему запросу ничего не нашлось");
+        } else if (searchSite != null) {
+            Set<Page> searchSitePagesByFirstLemma = allPagesByFirstLemma.stream()
+                    .filter(page -> page.getSite().equals(searchSite)).collect(Collectors.toSet());
+            response.setData(addSearchPageDataInfo(getPageRelInfo(searchSitePagesByFirstLemma)));
+            response.setCount(response.getData().size());
+            response.setResult(response.getCount() != 0);
+        } else {
+            response.setData(addSearchPageDataInfo(getPageRelInfo(allPagesByFirstLemma)));
+            response.setCount(response.getData().size());
+            response.setResult(response.getCount() != 0);
         }
         return response;
     }
@@ -88,9 +87,6 @@ public class SearchService {
         List<SearchPageData> dataList = new ArrayList<>();
         pageRelInfo.forEach((page, relevance) -> {
             StringBuilder snippet = buildSnippet(page);
-            if (snippet.length() == 0) {
-                return;
-            }
             SearchPageData data = null;
             try {
                 data = new SearchPageData(page.getSite().getUrl(),
@@ -102,98 +98,85 @@ public class SearchService {
             dataList.add(data);
         });
         Collections.sort(dataList);
-        return dataList.size() == 0 ? null : dataList;
+        return dataList;
     }
 
-    private Map<Page, Float> getPageRelInfo(Set<Index> indexSet) {
-        if (indexSet.size() == 0) {
-            return null;
-        }
-        Map<Integer, Set<Page>> indexOfLemmaAndPages = getIndexOfLemmaAndPages(indexSet);
-        Map<Page, Float> pageAndAbsRel = new HashMap<>();
-        indexOfLemmaAndPages.forEach((indexOfLemma, pages) -> pages.forEach(page -> {
-            float relevance = 0;
-            Iterator<Lemma> iterator = foundFilteredLemmasFromDB.iterator();
-            for (int i = 0; i <= indexOfLemma; i++) {
-                relevance += indexService.getIndexByPageAndLemma(page, iterator.next()).getRank();
-            }
-            pageAndAbsRel.put(page, relevance);
-        }));
-        Float divisor = pageAndAbsRel.values().stream().reduce(Math::max).orElse((float) 0);
-        return pageAndAbsRel.entrySet().stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue() / divisor));
-    }
-
-    private Map<Integer, Set<Page>> getIndexOfLemmaAndPages(Set<Index> indexSet) {
-        Map<Integer, Set<Page>> indexOfLemmaAndPages = new HashMap<>();
-        indexOfLemmaAndPages.put(0, indexSet.stream().map(Index::getPage).collect(Collectors.toSet()));
-        for (int i = 1; i < foundFilteredLemmasFromDB.size() - 1; i++) {
-            Set<Page> pagesOfPreviousLemma = indexOfLemmaAndPages.get(i - 1);
-            Set<Page> pagesOfThisLemma = indexService.getAllIndexesByLemma(foundFilteredLemmasFromDBIterator.next())
-                    .stream().map(Index::getPage).collect(Collectors.toSet());
-            Set<Page> result = pagesOfThisLemma.stream().filter(pagesOfPreviousLemma::contains)
-                    .peek(pagesOfPreviousLemma::remove).collect(Collectors.toSet());
-            if (result.size() == 0) {
-                break;
-            } else {
-                indexOfLemmaAndPages.put(i, result);
-            }
-            if (pagesOfPreviousLemma.size() == 0) {
-                indexOfLemmaAndPages.remove(i - 1);
-            } else {
-                indexOfLemmaAndPages.put(i - 1, pagesOfPreviousLemma);
-            }
-        }
-        return indexOfLemmaAndPages;
+    private Map<Page, Float> getPageRelInfo(Set<Page> pagesByFirstLemma) {
+        Map<Page, Float> pagesAndRanks = new HashMap<>();
+        pagesByFirstLemma.forEach(page -> {
+            float rank = foundFilteredLemmasFromDB.stream().map(indexService::getAllIndexesByLemma)
+                    .flatMap(Collection::stream)
+                    .filter(index -> index.getPage().equals(page)).map(Index::getRank).reduce(0f, Float::sum);
+            pagesAndRanks.put(page, rank);
+        });
+        float divisor = pagesAndRanks.values().stream().reduce(Math::max).orElse(0f);
+        return pagesAndRanks.entrySet().stream()
+                .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
+                .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue() / divisor,
+                        (e1, e2) -> e1, LinkedHashMap::new));
     }
 
     private StringBuilder buildSnippet(Page page) {
+
         StringBuilder snippet = new StringBuilder();
-
         String pageContent = page.getContent();
-
         Set<Lemma> foundFilteredLemmasByPage = getFoundFilteredLemmasByPage(page);
+        SortedMap<Integer, Integer> indexAndWordLength = getTextIndexAndWordLengthSorted(foundFilteredLemmasByPage,
+                pageContent);
 
-        Set<String> contentWordsSorted = getContentWordsSorted(foundFilteredLemmasByPage, pageContent);
+        indexAndWordLength.forEach((index, wordLength) -> {
 
-        contentWordsSorted.forEach(contentWord -> {
-            int pageStart = pageContent.toLowerCase().indexOf(contentWord);
-            int pageFinish = pageStart + contentWord.length();
-            int snippetStart = snippet.toString().toLowerCase().indexOf(contentWord);
-            int snippetFinish = snippetStart + contentWord.length();
-            int substringStart = Math.max(pageContent.toLowerCase().indexOf(contentWord) - 20, 0);
-            int substringFinish = Math.min(pageStart + contentWord.length() + (snippet.length() > 200 ? 20 : 100),
-                    pageContent.length() - 1);
-            String boldWord = "<b>" + pageContent.substring(pageStart, pageFinish) + "</b>";
-
-            if (snippet.toString().toLowerCase().contains(contentWord)) {
-                snippet.replace(snippetStart, snippetFinish, boldWord)
-                        .delete(snippet.toString().indexOf(boldWord) + boldWord.length(), snippet.length() - 1)
-                        .append(pageContent, pageFinish, substringFinish)
+            String word = pageContent.substring(index, index + wordLength);
+            if (snippet.toString().contains(word)) {//fixme work on it getProperIndex(snippet.toString(),word)>= 0
+                snippet.replace(snippet.toString().indexOf(word), snippet.toString().indexOf(word) + wordLength,
+                        "<b>" + word + "</b>");
+            } else if (snippet.length() < numberOfSymbols) {
+                snippet.append(snippet.length() > 0 ? "" : "...")
+                        .append(pageContent.subSequence(Math.max(index - 20, 0), index))
+                        .append("<b>")
+                        .append(word)
+                        .append("</b>")
+                        .append(pageContent.subSequence(index + wordLength,
+                                Math.min(index + wordLength + (indexAndWordLength.size() > 2 ? 50 : 100),
+                                        pageContent.length() - 1)))
                         .append("...");
-            } else {
-                String substring = pageContent.substring(substringStart, substringFinish)
-                        .replaceAll(pageContent.substring(pageStart, pageFinish),
-                                boldWord);
-                snippet.append(snippet.length() > 0 ? "" : "...").append(substring).append("...");
             }
         });
+
         return snippet;
     }
 
     private Set<Lemma> getFoundFilteredLemmasByPage(Page page) {
         return foundFilteredLemmasFromDB.stream()
-                .filter(lemma -> indexService.getAllIndexesByPage(page).stream()
-                        .map(index -> index.getLemma().getLemma()).toList().contains(lemma.getLemma()))
-                .collect(Collectors.toSet());
+                .filter(lemma -> indexService.getIndexByPageAndLemma(page, lemma) != null)
+                .map(lemma -> indexService.getIndexByPageAndLemma(page, lemma))
+                .map(Index::getLemma).collect(Collectors.toSet());
     }
 
-    private SortedSet<String> getContentWordsSorted(Set<Lemma> foundFilteredLemmasByPage, String pageContent) {
-        return lemmaService.getFilteredWordAndLemma(pageContent).entrySet().stream()
-                .filter(entry -> foundFilteredLemmasByPage.stream().map(Lemma::getLemma)
-                        .toList().contains(entry.getValue())).map(Map.Entry::getKey)
-                .sorted(Comparator.comparingInt(word -> pageContent.toLowerCase().indexOf(word)))
-                .collect(Collectors.toCollection(TreeSet::new));
+    private SortedMap<Integer, Integer> getTextIndexAndWordLengthSorted(Set<Lemma> foundFilteredLemmasByPage,
+                                                                        String pageContent) {
+        Set<String> contentWords = lemmaService.getFilteredWordAndLemma(pageContent).entrySet().stream()
+                .filter(entry -> foundFilteredLemmasByPage.stream().map(Lemma::getLemma).toList()
+                        .contains(entry.getValue())).map(Map.Entry::getKey).collect(Collectors.toSet());
+        Map<Integer, Integer> textIndexAndContentWord = new HashMap<>();
+        contentWords.forEach(word -> {
+            int index = getProperIndex(pageContent.toLowerCase(), word);
+            textIndexAndContentWord.put(index, word.length());
+        });
+        return new TreeMap<>(textIndexAndContentWord);
+    }
+
+    private int getProperIndex(String lowerCaseContent, String word) {
+        int index = lowerCaseContent.toLowerCase().indexOf(word);//fixme first and last symbols правила посещения театра - may not need to go through all lowerCaseContent театральн
+        while ((!lowerCaseContent.substring(index <= 0 ? index : index - 1,
+                        Math.min((index + word.length() + 1), lowerCaseContent.length() - 1))
+                .matches(lemmaService.getRegex() + "+" + word + lemmaService.getRegex() + "*"))
+        || (!lowerCaseContent.substring(index <= 0 ? index : index - 1,
+                        Math.min((index + word.length() + 1), lowerCaseContent.length() - 1))
+                .matches(lemmaService.getRegex() + "*" + word + lemmaService.getRegex() + "+"))) {
+            index = lowerCaseContent.toLowerCase().indexOf(word, index + 1);
+        }
+        return index;
     }
 
     public double getPercentOfPages() {
@@ -202,5 +185,13 @@ public class SearchService {
 
     public void setPercentOfPages(double percentOfPages) {
         this.percentOfPages = percentOfPages;
+    }
+
+    public int getNumberOfSymbols() {
+        return numberOfSymbols;
+    }
+
+    public void setNumberOfSymbols(int numberOfSymbols) {
+        this.numberOfSymbols = numberOfSymbols;
     }
 }

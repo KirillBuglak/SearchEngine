@@ -4,11 +4,9 @@ import org.apache.lucene.morphology.LuceneMorphology;
 import org.apache.lucene.morphology.russian.RussianLuceneMorphology;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import searchengine.model.Lemma;
 import searchengine.model.Page;
 import searchengine.repositories.LemmaRepository;
-import searchengine.services.IndexingService;
 
 import java.io.IOException;
 import java.util.*;
@@ -64,7 +62,7 @@ public class LemmaService {
         List<String> lemmas = getFilteredLemmas(page.getContent());
         lemmas.forEach(lemma -> {
             Optional<Lemma> perPageOptional = lemmasPerPage.stream().filter(Lemma -> Lemma.getLemma()
-                    .replace('ё', 'е').equals(lemma.replace('ё', 'е')))
+                            .replace('ё', 'е').equals(lemma.replace('ё', 'е')))
                     .findFirst();
             if (perPageOptional.isPresent()) {
                 Lemma perPageLemma = perPageOptional.get();
@@ -103,9 +101,9 @@ public class LemmaService {
 
     public HashMap<String, String> getFilteredWordAndLemma(String text) {
         HashMap<String, String> wordAndLemma = new HashMap<>();
-        ArrayList<String> words = Arrays.stream(text.trim().toLowerCase().split(regex))
-                .filter(realWords).filter(neededWords).distinct().collect(Collectors.toCollection(ArrayList::new));
-        words.forEach(word -> wordAndLemma.put(word, morphology.getNormalForms(word).get(0)));//fixme may need only the first word
+        Set<String> words = Arrays.stream(text.trim().toLowerCase().split(regex))
+                .filter(realWords).filter(neededWords).collect(Collectors.toSet());
+        words.forEach(word -> wordAndLemma.put(word, morphology.getNormalForms(word).get(0)));
         return wordAndLemma;
     }
 
@@ -137,5 +135,9 @@ public class LemmaService {
 
     public Set<Lemma> getLemmasBySiteUrl(String siteUrl) {
         return lemmaRepository.findBySiteUrl(siteUrl);
+    }
+
+    public String getRegex() {
+        return regex;
     }
 }
