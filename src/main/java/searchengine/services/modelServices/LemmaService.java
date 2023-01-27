@@ -79,7 +79,7 @@ public class LemmaService {
         Set<Lemma> dbLemmasToUpdateFreq = dbLemmasWithoutID.stream()
                 .map(lemma -> lemmaRepository.findByLemmaAndSite(lemma.getLemma(), lemma.getSite()))
                 .collect(Collectors.toSet());
-        if (dbLemmasToUpdateFreq.size() != 0) {
+        if (!dbLemmasToUpdateFreq.isEmpty()) {
             dbLemmasToUpdateFreq.forEach(lemma -> lemma.setFrequency(lemma.getFrequency() + 1));
             lemmaRepository.saveAll(dbLemmasToUpdateFreq);
         }

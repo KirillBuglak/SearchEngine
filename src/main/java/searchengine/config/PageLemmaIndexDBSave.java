@@ -16,7 +16,6 @@ import searchengine.services.modelServices.LemmaService;
 import searchengine.services.modelServices.PageService;
 import searchengine.services.modelServices.SiteService;
 
-import java.io.IOException;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.RecursiveAction;
@@ -44,71 +43,64 @@ public class PageLemmaIndexDBSave extends RecursiveAction {
 
     @Override
     public synchronized void compute() {
-
+        Site site = page.getSite();
         Document document = requestDoc(page.getFullPath());
+        if (document == null) {
+            if (pageService.getAllPagesBySite(site).isEmpty()) {
+                site.setLastError("Не проиндексировано ни одной страницы");
+            }
+            return;
+        }
         pageService.save(page);
         lemmaService.saveLemmas(page);
         indexService.saveIndexes(page);
-        Site site = page.getSite();
+
         siteService.updateTimeOfSite(site);
 
-        Elements elements = null;
-        if (document != null) {
-            elements = document.select("a[href]");
-        }
+        Elements elements = document.select("a[href]");
 
-        if (elements != null) {
-            elements.forEach(element -> {
-                if (stoppedByUser(site)) {
-                    try {
-                        this.get();
-                    } catch (InterruptedException | ExecutionException e) {
-                        throw new RuntimeException(e);
-                    }
+        elements.forEach(element -> {
+            if (stoppedByUser(site)) {
+                try {
+                    this.get();
+                } catch (InterruptedException | ExecutionException e) {
+                    throw new RuntimeException(e);
                 }
-                String link = element.absUrl("href");
-                String pagePath = null;
-                Document doc = null;
+            }
+            String link = element.absUrl("href");
+            String pagePath;
 
-                if (link.contains(page.getFullPath()) && link.matches(pageRegEx)) {
-                    pagePath = link.substring(site.getUrl().length());
-                    try {
-                        doc = getConnection(link).get();
-                        Connection.Response execute = getConnection(link).execute();
-                        execute.contentType();
-                    } catch (IOException ignored) {
-                    }
-                }
+            if (link.contains(page.getFullPath()) && link.matches(pageRegEx)) {
+                pagePath = link.substring(site.getUrl().length());
+            } else {
+                return;
+            }
 
-                if ((pagePath != null && pageService.getPageByPathAndSite(pagePath, site) == null
-                        && !link.equals(site.getUrl()) && doc != null)) {
-                    log.info(link);
-                    Page newPage = new Page(site, pagePath, 0, null);
-                    PageLemmaIndexDBSave task = new PageLemmaIndexDBSave(pageService, lemmaService, indexService,
-                            siteService);
-                    task.setPage(newPage);
-                    task.fork();
-                    try {
-                        task.join();
-                    } catch (Exception e) {
-                        site.setLastError("Ошибка во время индексации страницы с ID = " + page.getId());
-                        siteService.saveSiteIndexedOrFailed(site);
-                        log.error("Error in compute method, {}", e.toString());
-                    }
+            if ((pageService.getPageByPathAndSite(pagePath, site) == null && !link.equals(site.getUrl()))) {
+                log.info(link);
+                Page newPage = new Page(site, pagePath, 0, null);
+                PageLemmaIndexDBSave task = new PageLemmaIndexDBSave(pageService, lemmaService, indexService,
+                        siteService);
+                task.setPage(newPage);
+                task.fork();
+                try {
+                    task.join();
+                } catch (Exception e) {
+                        log.info("Ошибка во время индексации страницы с URL = " + page.getFullPath());
                 }
-            });
-        }
+            }
+        });
+
     }
 
     public Document requestDoc(String pageUrl) {
         Connection connection = getConnection(pageUrl);
-        setPageCodeAndContent(page, connection);
         Document document;
         try {
             document = connection.get();
+            setPageCodeAndContent(page, connection);
         } catch (Exception e) {
-            document = null;
-            log.error("Error in requestDoc method, {}", e.toString());
+            return null;
         }
         return document;
     }
@@ -126,7 +118,6 @@ public class PageLemmaIndexDBSave extends RecursiveAction {
             connection.get().getAllElements().stream().map(Element::text).filter(string -> !string.isBlank()).toList()
                     .forEach(string -> content.append(string).append("\n"));
         } catch (Exception e) {
-            log.error("Error in setPageCodeAndContent method, {}", e.toString());
             return;
         }
         page.setCode(statusCode);

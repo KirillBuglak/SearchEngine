@@ -51,7 +51,7 @@ public class IndexingService {
         IndexPageResponse pageResponse = new IndexPageResponse();
         if (url.isBlank() || getPageStatusCode(url) != 200 || !url.matches(justGetFields.getPageRegEx())) {
             pageResponse.setError("Проверьте правильность ввода адреса страницы");
-        } else if (siteService.getAllSites().stream().map(Site::getUrl).filter(url::contains).toList().size() == 0) {
+        } else if (siteService.getAllSites().stream().map(Site::getUrl).filter(url::contains).toList().isEmpty()) {
             pageResponse.setError("Данная страница находится за пределами сайтов, указанных в конфигурационном файле");
         } else {
             ExecutorService executorService = Executors.newSingleThreadExecutor();
@@ -126,7 +126,7 @@ public class IndexingService {
     }
 
     private void deleteEverything() {
-        if (pageService.getAllPages().size() != 0) {
+        if (!pageService.getAllPages().isEmpty()) {
             indexService.deleteAllIndexes();
             lemmaService.deleteAllLemmas();
             pageService.deleteAllPages();

@@ -43,7 +43,7 @@ public class StatisticsService {
             item.setUrl(siteConf.getUrl());
             int pages;
             int lemmas;
-            if (siteService.getAllSites().size() != 0) {
+            if (!siteService.getAllSites().isEmpty()) {
                 pages = pageService.getAllPagesBySite(siteService.getSiteByURL(siteConf.getUrl())).size();
                 lemmas = lemmaService.getLemmasBySiteUrl(siteConf.getUrl()).size();
                 item.setStatus(siteService.getSiteByURL(siteConf.getUrl()).getStatus().toString());

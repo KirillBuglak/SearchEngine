@@ -33,6 +33,9 @@ public class SearchService {
     private final IndexService indexService;
     private final PageService pageService;
     private SortedSet<Lemma> foundFilteredLemmasFromDB;
+    private List<SearchPageData> allSitesData;
+    private final String savedQuery;
+
 
     public SearchService(LemmaService lemmaService,
                          SiteService siteService,
@@ -42,6 +45,8 @@ public class SearchService {
         this.siteService = siteService;
         this.indexService = indexService;
         this.pageService = pageService;
+        allSitesData = new ArrayList<>();
+        savedQuery = "";
     }
 
     public SearchResponse getSearch(String query, String searchSiteUrl, int offset, int limit) {
@@ -64,24 +69,28 @@ public class SearchService {
 
         Set<Page> allPagesByFirstLemma = firstLemmasForAllSites.stream().map(indexService::getAllIndexesByLemma)
                 .flatMap(Collection::stream).map(Index::getPage).collect(Collectors.toSet());
-
         if (query.isBlank()) {
             response.setError("Задан пустой поисковый запрос");
             return response;
-        } else if (foundFilteredLemmasFromDB.size() == 0) {
+        } else if (foundFilteredLemmasFromDB.isEmpty() || (searchSite != null
+                && foundFilteredLemmasFromDB.stream().filter(lemma -> lemma.getSite().equals(searchSite)).toList()
+                .isEmpty())) {
             response.setError("По вашему запросу ничего не нашлось");
             return response;
         } else if (searchSite != null) {
             Set<Page> searchSitePagesByFirstLemma = allPagesByFirstLemma.stream()
                     .filter(page -> page.getSite().equals(searchSite)).collect(Collectors.toSet());
-            List<SearchPageData> data = addSearchPageDataInfo(getPageRelInfo(searchSitePagesByFirstLemma));
-            response.setData(data.subList(offset, Math.min((offset + limit), data.size() - 1)));
-            response.setCount(response.getData().size());
+            List<SearchPageData> data = allSitesData.isEmpty() && !query.equals(savedQuery)
+                    ?addSearchPageDataInfo(getPageRelInfo(searchSitePagesByFirstLemma))
+                    :allSitesData.stream().filter(d->d.getSite().equals(searchSite.getUrl()))
+                    .collect(Collectors.toList());
+            response.setData(data.subList(offset, Math.min((offset + limit), data.size())));
+            response.setCount(data.size());
             response.setResult(response.getCount() != 0);
         } else {
-            List<SearchPageData> data = addSearchPageDataInfo(getPageRelInfo(allPagesByFirstLemma));
-            response.setData(data.subList(offset, Math.min((offset + limit), data.size() - 1)));
-            response.setCount(response.getData().size());
+            allSitesData = addSearchPageDataInfo(getPageRelInfo(allPagesByFirstLemma));
+            response.setData(allSitesData.subList(offset, Math.min((offset + limit), allSitesData.size())));
+            response.setCount(allSitesData.size());
             response.setResult(response.getCount() != 0);
         }
         return response;
@@ -91,6 +100,9 @@ public class SearchService {
         List<SearchPageData> dataList = new ArrayList<>();
         pageRelInfo.forEach((page, relevance) -> {
             StringBuilder snippet = buildSnippet(page);
+            if (snippet.toString().equals("")){
+                return;
+            }
             SearchPageData data = null;
             try {
                 data = new SearchPageData(page.getSite().getUrl(),
