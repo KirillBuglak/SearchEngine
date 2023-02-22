@@ -1,12 +1,6 @@
 <h1 align="center">Search Engine</h1>
 
 ----
-<h2 align="center"> 
-<p>Java-разработчик с нуля.</p>
-<p>Итоговый проект курса «Поисковый движок»</p>
-</h2>
-
-----
 <p align="center">
 <img src="imagesForReadme/1.gif"></p>
 <h2 align="center"><a  href="https://www.youtube.com/watch?v=VEODIthri6A">Демонстрация работы приложения</a></h2>
