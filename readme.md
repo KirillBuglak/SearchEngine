@@ -9,15 +9,15 @@
 ## Stack
 Java, Spring Boot, Maven, JDBC, Hibernate, SQL, JSOUP, Morphology Library, Lombok.
 ____
-## Краткое описание
-Данное Spring Boot приложение является локальным поисковым движком,
-основной функциональностью которого являются:
-<li>отображение общей и детальной статистики по сайтам, указанных в конфигурационном файле - application.yaml;</li>
-<li>индексация страниц сайтов;</li>
-<li>поиск по данным страницам.</li>
+## Short description
+This Spring Boot app is a local search engine.
+Functionality includes:
+<li>displaying of main and detailed site statistics, sites' addresses could be found in configuration file - application.yaml;</li>
+<li>site's pages indexing;</li>
+<li>search on these indexed pages.</li>
 
 ____
-## Вкладка DASHBOARD
+## DASHBOARD panel
 <p align="center">
 <img src="imagesForReadme/2.png"></p>
 
@@ -57,7 +57,7 @@ ____
 </details> 
 
 ___
-## Вкладка MANAGEMENT
+## MANAGEMENT panel
 <p align="center">
 <img src="imagesForReadme/3.png"></p>
 <p align="center">
@@ -126,7 +126,7 @@ ______
 </details> 
 
 ___
-## Вкладка SEARCH
+## SEARCH panel
 <p align="center">
 <img src="imagesForReadme/5.png"></p>
 
@@ -176,10 +176,10 @@ ______
 </details> 
 
 ___
-## Как запустить
-Для работы приложения необходимо:
-<li>установить MySQL (8.0);</li>
-<li>настроить соединение с базой данных по конфигурации - application.yaml.</li>
+## How to build
+You would need:
+<li>installed MySQL (8.0);</li>
+<li>established DB connection, config file - application.yaml.</li>
 
 ```
 server:
