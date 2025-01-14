@@ -19,7 +19,7 @@ Functionality includes:
 <li>search on these indexed pages.</li>
 
 ____
-## DASHBOARD tab
+## DASHBOARD TAB
 <p align="center">
 <img src="imagesForReadme/2.png"></p>
 
@@ -57,7 +57,7 @@ Indexing time, number of indexed pages and lemmas of a particular site, and erro
 </details> 
 
 ___
-## MANAGEMENT tab
+## MANAGEMENT TAB
 <p align="center">
 <img src="imagesForReadme/3.png"></p>
 <p align="center">
@@ -126,7 +126,7 @@ ______
 </details> 
 
 ___
-## SEARCH tab
+## SEARCH TAB
 <p align="center">
 <img src="imagesForReadme/5.png"></p>
 
